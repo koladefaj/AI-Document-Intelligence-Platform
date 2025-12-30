@@ -1,4 +1,4 @@
-from sqlalchemy import String, Boolean, ForeignKey
+from sqlalchemy import String, Boolean, ForeignKey, Text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 import uuid
 
@@ -47,3 +47,9 @@ class Document(Base):
     content: Mapped[str] = mapped_column(String, nullable=False)
     url: Mapped[str] = mapped_column(String, nullable=False)
     owner_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"))
+
+    local_path: Mapped[str] = mapped_column(String, nullable=False)
+    status: Mapped[str] = mapped_column(String, default="PENDING")
+
+    raw_text: Mapped[str] = mapped_column(Text, nullable=True)
+    analysis: Mapped[str] = mapped_column(Text, nullable=True)

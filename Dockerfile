@@ -11,6 +11,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl build-essential && \
     rm -rf /var/lib/apt/lists/*
 
+# install system dependencies for OCR
+RUN apt-get update && apt-get install -y  \
+    tesseract-ocr \
+    poppler-utils \
+    libtesseract-dev \
+    && rm -rf /var/lib/apt/lists/*
+
 # Install Poetry
 RUN curl -sSL https://install.python-poetry.org | python3 -
 ENV PATH="/root/.local/bin:/usr/local/bin:$PATH"

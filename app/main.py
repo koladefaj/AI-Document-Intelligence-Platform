@@ -26,7 +26,7 @@ async def request_id_middleware(request: Request, call_next):
     response.headers["X-Request-Id"] = request_id
     return response
 
-@app.get("/health", status_code=200)
+@app.get("/", status_code=200)
 def health_check(request: Request):
     logger.info("Health check called", extra={"request_id": request.state.request_id})
     return {"status": "ok"}
