@@ -1,122 +1,126 @@
-import pytesseract
-from PyPDF2 import PdfReader
-from PIL import Image
-from pdf2image import convert_from_path
-import pandas as pd
 import os
-import tempfile
+import logging
+import pandas as pd
+import ollama
+import asyncio
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_message
+from PyPDF2 import PdfReader
 from google import genai
-from app.infrastructure.config import settings
 from docx import Document as DocxReader
+from app.infrastructure.config import settings
+from app.domain.services.document_processor import DocumentProcessorInterface
 
+logger = logging.getLogger(__name__)
 
-
-class DocumentProcessor:
+class DocumentProcessor(DocumentProcessorInterface):
     def __init__(self):
-        # Initialize the client once during startup
-        # Strip quotes in case they exist in the .env file
+        self.provider = settings.ai_provider.lower()
+        # Clean the API key (removes potential quotes from .env parsing)
         self.api_key = settings.gemini_api.strip('"')
-        self.client = genai.Client(api_key=self.api_key)
-
-
-    def extract_text(self, file_path: str) -> str:
-        """Handles normal digital PDFs"""
-        try:
-            # Only try Pdf reading if its pdf
-            if not file_path.lower().endswith(".pdf"):
-                return ""
-            reader = PdfReader(file_path)
-            text = ""
-            for page in reader.pages:
-                extracted = page.extract_text()
-                if extracted:
-                    text += extracted + "\n"
-            return text
-        except Exception:
-            return ""
-
-
-    def ocr_text(self, file_path: str) -> str:
-        """OCR for images or scanned PDFs"""
-        # if it's a PDF convert each page to image
-        text = ""
-        try:
-            if file_path.lower().endswith(".pdf"):
-                pages = convert_from_path(file_path)
-                for page in pages:
-                    with tempfile.NamedTemporaryFile(suffix="png", delete=False) as tmp:
-                        page.save(tmp.name, "PNG")
-                        text += pytesseract.image_to_string(Image.open(tmp.name), lang="eng")
-                        os.remove(tmp.name)
-            elif file_path.lower().endswith((".png", ".jpg", ".jpeg")):
-                text = pytesseract.image_to_string(Image.open(file_path), lang="eng")
-
-        except Exception as e:
-            print(f"OCR Error: {e}")
-
-        return text
-    
-    def get_ai_summary(self, text: str) -> str:
-        """Uses Gemini's Free Tier to summarize the document"""
-
-        if not text or len(text.strip()) < 50:
-            return "Text too short to summarize."
-
-        try:
-            model = 'gemini-1.5-flash'
-            prompt = f"Summarize this document professionally in 3-5 bullet points:\n\n{text[:15000]}"
-            
-            response = self.client.models.generate_content(model=model, contents=prompt)
-            return response.text
-        except Exception as e:
-            print(f"gemini error: {e}")
-            raise e
-
-    def analyze_text(self, text: str) -> dict:
-        """Return metadata / structure"""
-
-        summary = self.get_ai_summary(text)
         
-        safe_text = text if text else ""
+        # New 2025/2026 GenAI Client
+        self.gemini_client = genai.Client(api_key=self.api_key)
+        self.ollama_model = "qwen2.5-vl:3b"
 
-        return {
-            "summary": summary,
-            "word_count": len(safe_text.split()),
-            "contains_email": "@" in safe_text,
-            "contains_money": any(symbol in safe_text for symbol in ["$", "USD"])
-        }
-
-    def process(self, file_path: str) -> dict:
+    def _extract_text_metadata(self, file_path: str) -> str:
+        """Fallback text extraction for metadata and word counts."""
+        ext = os.path.splitext(file_path)[1].lower()
         text = ""
-        ext = file_path.lower()
-
         try:
-            if ext.endswith(".pdf"):
-                text = self.extract_text(file_path)
-            
-            elif ext.endswith((".docx", ".doc")):
+            if ext == ".pdf":
+                reader = PdfReader(file_path)
+                text = "\n".join([p.extract_text() or "" for p in reader.pages])
+            elif ext in [".docx", ".doc"]:
                 doc = DocxReader(file_path)
                 text = "\n".join([p.text for p in doc.paragraphs])
-            
-            elif ext.endswith((".xlsx", ".xls", ".csv")):
-                # For Excel, we convert the rows to a text string
-                df = pd.read_excel(file_path) if not ext.endswith(".csv") else pd.read_csv(file_path)
+            elif ext in [".xlsx", ".xls", ".csv"]:
+                # engine='openpyxl' is preferred for modern Excel files
+                df = pd.read_excel(file_path) if ext != ".csv" else pd.read_csv(file_path)
                 text = df.to_string()
-            
-            elif ext.endswith(".txt"):
+            elif ext == ".txt":
                 with open(file_path, "r", encoding="utf-8") as f:
                     text = f.read()
-
-            # FALLBACK: If it's an image or a scanned PDF (text is still empty)
-            if not text or not text.strip():
-                if ext.endswith((".png", ".jpg", ".jpeg", ".pdf")):
-                    text = self.ocr_text(file_path)
-
         except Exception as e:
-            print(f"Extraction error: {e}")
-            text = ""
+            logger.error(f"Text extraction failed for {file_path}: {e}")
+        return text
+
+    @retry(
+        stop=stop_after_attempt(5),
+        wait=wait_exponential(multiplier=2, min=10, max=60),
+        retry=retry_if_exception_message(match=".*Rate Limit.*|.*429.*")
+    )
+    async def _get_gemini_summary(self, file_path: str, mime_type: str) -> str:
+        """
+        Sends the file to Gemini 2.0 Flash.
+        Uses tenacity to auto-retry on 429 'Rate Limit' errors.
+        """
+        try:
+            # Step 1: Upload the file to the Gemini File API
+            uploaded_file = self.gemini_client.files.upload(
+                file=file_path, 
+                config={'mime_type': mime_type}
+            )
+
+            await asyncio.sleep(2)
+            
+            # Step 2: Generate content with the 2.0 Flash model
+            # 2.0 Flash is faster and more cost-effective for summaries
+            response = self.gemini_client.models.generate_content(
+                model='gemini-2.0-flash',
+                contents=[
+                    "Analyze this document and provide a professional 4-bullet point summary.",
+                    uploaded_file
+                ]
+            )
+            return response.text.strip()
+            
+        except Exception as e:
+            if "429" in str(e):
+                logger.warning("Gemini Rate Limit (429) hit. Tenacity is retrying...")
+                raise Exception("Gemini Rate Limit reached.")
+            raise Exception(f"Gemini Cloud Error: {str(e)}")
+
+    async def _get_ollama_summary(self, file_path: str) -> str:
+        """Local fallback using Ollama for privacy-sensitive or offline tasks."""
+        try:
+            # Using loop.run_in_executor because ollama-python is currently sync
+            loop = asyncio.get_event_loop()
+            response = await loop.run_in_executor(
+                None, 
+                lambda: ollama.chat(
+                    model=self.ollama_model,
+                    messages=[{
+                        'role': 'user',
+                        'content': 'Summarize this document in 4 professional bullet points.',
+                        'images': [file_path] 
+                    }]
+                )
+            )
+            return response['message']['content']
+        except Exception as e:
+            logger.error(f"Local VLM Error: {e}")
+            return f"Local VLM Error: {str(e)}"
+
+    async def process(self, file_path: str, mime_type: str = None) -> dict:
+        """Main entry point for document analysis."""
+        logger.info(f"Processing document with {self.provider}: {file_path}")
+
+        if self.provider == "ollama":
+            summary = await self._get_ollama_summary(file_path)
+        else:
+            summary = await self._get_gemini_summary(file_path, mime_type)
+
+        raw_text = self._extract_text_metadata(file_path)
+
+        analysis = {
+            "summary": summary,
+            "word_count": len(raw_text.split()),
+            "contains_email": "@" in raw_text,
+            "contains_money": any(s in raw_text for s in ["$", "USD", "NGN", "€"]),
+            "ai_provider": self.provider
+        }
 
         return {
-            "raw_text": text,
-            "analysis": self.analyze_text(text)
+            "raw_text": raw_text,
+            "analysis": analysis
         }

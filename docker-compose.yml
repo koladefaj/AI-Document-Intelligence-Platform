@@ -4,30 +4,40 @@ services:
   backend:
     build: .
     container_name: document_backend
+    # Use --reload only in development
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     ports:
       - "8000:8000"
     env_file:
       - .env
     depends_on:
-      - db
-      - redis
-      - minio
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      minio:
+        condition: service_started
     volumes:
       - .:/app
       - uploaded_files:/app/app/files
+
   db:
     image: postgres:18-alpine
     container_name: postgres_db
     restart: always
     environment:
-      POSTGRES_USER: root
-      POSTGRES_PASSWORD: root
-      POSTGRES_DB: document_backend
+      POSTGRES_USER: ${POSTGRES_USER:-root}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-root}
+      POSTGRES_DB: ${POSTGRES_DB:-document_backend}
     ports:
       - "${DB_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-root} -d ${POSTGRES_DB:-document_backend}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   redis:
     image: redis:latest
@@ -47,17 +57,37 @@ services:
       - "${MINIO_CONSOLE_PORT:-9001}:9001"
     volumes:
       - minio_data:/data
+  
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    volumes:
+      - ollama_storage:/root/.ollama
+    ports:
+      - "11434:11434"
+    # Added qwen2.5-vl for vision capabilities
+    entrypoint: /bin/sh -c "ollama serve & sleep 5 && ollama pull qwen2.5-vl:7b && wait"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
 
   worker:
-    build:
-      context: .
-      dockerfile: Dockerfile.worker
+    build: .
     container_name: celery_worker
-    command: celery -A app.workers.document_worker worker --loglevel=info
+    # Ensure the path to worker_file matches your app structure
+    command: celery -A app.infrastructure.queue.celery_app worker --loglevel=info -P solo
     env_file: .env
+    environment:
+      - OLLAMA_HOST=http://ollama:11434
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-root}:${POSTGRES_PASSWORD:-root}@db:5432/${POSTGRES_DB:-document_backend}
+      - REDIS_URL=redis://redis:6379/0
     depends_on:
-      - redis
-      - db
+      db:
+        condition: service_healthy
+      ollama:
+        condition: service_healthy
     volumes:
       - .:/app
       - uploaded_files:/app/app/files
@@ -66,3 +96,4 @@ volumes:
   postgres_data:
   minio_data:
   uploaded_files:
+  ollama_storage:

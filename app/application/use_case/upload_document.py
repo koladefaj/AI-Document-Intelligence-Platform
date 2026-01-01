@@ -1,45 +1,79 @@
-import uuid, os
-from fastapi import Depends
-from app.infrastructure.db.models import Document
+import os
+import logging
+from sqlalchemy.ext.asyncio import AsyncSession
+from app.infrastructure.db.models import Document, User
 from app.domain.services.storage_interface import StorageInterface
-from app.dependencies import get_storage_service
-from app.infrastructure.auth.dependencies import get_current_user
 
+# Initialize logger
+logger = logging.getLogger(__name__)
 
+async def handle_upload(file, session: AsyncSession, user: User, storage: StorageInterface):
+    """
+    Coordinates the document upload workflow.
+    
+    Workflow:
+    1. Sanitize the filename for safe storage.
+    2. Create a 'PENDING' record in Postgres to generate a UUID.
+    3. Stream file bytes to the Storage Provider (MinIO or Local) using that UUID.
+    4. Update the DB record with the final storage path and commit.
+    """
+    
+    # 1. Filename Sanitization
+    # We replace spaces with underscores to prevent URL encoding issues later.
+    clean_filename = os.path.basename(file.filename).replace(" ", "_")
 
-UPLOAD_DIR = "app/files"
-os.makedirs(UPLOAD_DIR, exist_ok=True)
-
-async def handle_upload(file, session, user, storage: StorageInterface = Depends(get_storage_service)):
-
-    file_id = f"{uuid.uuid4()}-{file.filename}"
-    local_path = os.path.join(UPLOAD_DIR, file_id)
-
-    with open(local_path, "wb") as f:
-        f.write(await file.read())
-
-    # Upload to S3 / MinIO
-    with open(local_path, "rb") as f:
-        file_bytes = f.read()
-
-
-    url = await storage.upload(file_id=file_id, file_name = file.filename, file_bytes=file_bytes, content_type=file.content_type)
-
-
-    print("this is the obj",user)
-    print("the id", user.id)
-
-    # Save metadata in database
+    # 2. Initial Database Entry
+    # We use "TEMP" placeholders because we don't know the final path until 
+    # the storage provider finishes its work.
     doc = Document(
-        file_name=file.filename,
-        content = file.content_type,
-        url = url,
-        local_path = local_path,
+        file_name=clean_filename,
+        content=file.content_type,
         owner_id=user.id,
-        status="PENDING"
-
+        status="PENDING",
+        url="TEMP",
+        local_path="TEMP",
+        raw_text="",
+        analysis={} # Using empty dict as we updated the model to JSON
     )
+    
     session.add(doc)
-    await session.commit()
-    print(doc, url, local_path)
-    return doc, url, local_path
+    
+    # --- CRITICAL STEP: Flush ---
+    # This communicates with Postgres to get the auto-generated UUID (doc.id)
+    # but does NOT end the transaction. If storage fails, we can still rollback.
+    await session.flush() 
+
+    # 3. Preparation for Storage
+    storage_file_id = str(doc.id)
+    
+    try:
+        # Reset file cursor to start before reading
+        await file.seek(0)
+        file_bytes = await file.read()
+
+        # 4. Storage Provider Handoff
+        # 'final_path' will be the /app/storage/... path or the MinIO URL
+        logger.info(f"Storage: Uploading document {storage_file_id} ({clean_filename})")
+        final_path = await storage.upload(
+            file_id=storage_file_id, 
+            file_name=clean_filename, 
+            file_bytes=file_bytes, 
+            content_type=file.content_type
+        )
+
+        # 5. Metadata Finalization
+        doc.local_path = final_path
+        doc.url = f"/api/v1/files/{storage_file_id}" 
+        
+        # 6. Atomic Commit
+        # Only now is the user's data officially saved to the DB.
+        await session.commit()
+        await session.refresh(doc)
+        
+        logger.info(f"Upload Complete: Document {doc.id} is ready for processing.")
+        return doc
+        
+    except Exception as e:
+        logger.error(f"Upload Handoff Failed: {str(e)}")
+        await session.rollback()
+        raise

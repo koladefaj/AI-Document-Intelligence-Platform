@@ -1,22 +1,62 @@
 import logging
+import sys
 from contextvars import ContextVar
 
-# Request ID lives here during request lifecycle
-request_id_var = ContextVar("request_id", default=None)
+# --- 1. CONTEXTUAL TRACING ---
+# Dev Note: ContextVar is thread-safe and async-safe. 
+# It allows us to carry the 'request_id' from the FastAPI middleware 
+# all the way into the Celery worker and every helper function in between.
+request_id_var = ContextVar("request_id", default="system")
 
 class RequestIdFilter(logging.Filter):
+    """
+    A filter that injects the current 'request_id' into every LogRecord.
+    This makes 'request_id' available to the Formatter.
+    """
     def filter(self, record):
+        # If no request_id is set (e.g., during app startup), 
+        # it defaults to "system" instead of "n/a" for better clarity.
         record.request_id = request_id_var.get()
         return True
 
 def setup_logging():
-    logging.basicConfig(
-        level=logging.INFO,
-        format='{"asctime": "%(asctime)s", "levelname": "%(levelname)s", '
-               '"name": "%(name)s", "message": "%(message)s", '
-               '"request_id": "%(request_id)s"}'
+    """
+    Initializes the global logging system with a JSON formatter.
+    
+    Why JSON? 
+    In 2026 production environments, logs are collected by machines (Logstash/Vector). 
+    JSON allows these tools to index fields like 'request_id' and 'levelname' 
+    without complex Regex parsing.
+    """
+    # 1. Choose where logs go (Standard Out is best for Docker)
+    handler = logging.StreamHandler(sys.stdout)
+    
+    # 2. Attach our custom filter
+    handler.addFilter(RequestIdFilter())
+    
+    # 3. Define the Structured JSON Format
+    # Dev Note: Adding 'module' and 'lineno' helps developers find the 
+    # exact line of code that triggered an error.
+    formatter = logging.Formatter(
+        '{"timestamp": "%(asctime)s", "level": "%(levelname)s", '
+        '"logger": "%(name)s", "file": "%(module)s.py:%(lineno)d", '
+        '"message": "%(message)s", "request_id": "%(request_id)s"}'
     )
+    handler.setFormatter(formatter)
 
-    # Apply the filter so request_id isn't null
-    for handler in logging.root.handlers:
-        handler.addFilter(RequestIdFilter())
+    # 4. Configure the Root Logger
+    root_logger = logging.getLogger()
+    
+    # Dev Note: Consider setting this to DEBUG in development 
+    # via an environment variable like LOG_LEVEL=DEBUG
+    root_logger.setLevel(logging.INFO)
+    
+    # 5. Clean up duplicate handlers 
+    # (Important for preventing double logs when FastAPI reloads)
+    if root_logger.hasHandlers():
+        root_logger.handlers.clear()
+        
+    root_logger.addHandler(handler)
+
+    # Optional: Silence noisy third-party libraries (e.g., urllib3, boto3)
+    logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
