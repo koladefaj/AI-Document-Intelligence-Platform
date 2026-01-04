@@ -72,4 +72,4 @@ jobs:
         JWT_ALGORITHM: "HS256"
         AI_PROVIDER: "mock"
         STORAGE_TYPE: "local"
-      run: poetry run pytest
+      run: poetry run pytest -o asyncio_mode=auto
