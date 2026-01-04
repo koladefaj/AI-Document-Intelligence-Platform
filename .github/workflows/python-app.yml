@@ -44,6 +44,15 @@ jobs:
     - name: Run Pytest
       env:
         ENV: testing
-        DATABASE_URL: postgresql://user:password@localhost:5432/test_db
+        # Database & Redis (pointing to localhost inside the Runner)
+        DATABASE_URL: postgresql+asyncpg://user:password@localhost:5432/test_db
         REDIS_URL: redis://localhost:6379/0
+        
+        # Pulling your secrets from GitHub Settings
+        SECRET_KEY: ${{ secrets.SECRET_KEY }}
+        GEMINI_API: ${{ secrets.GEMINI_API }}
+        
+        # AI & Storage Settings for CI
+        AI_PROVIDER: "mock"      # Don't try to run Ollama in the cloud
+        STORAGE_TYPE: "local"    # Avoid needing a real Minio in the cloud
       run: poetry run pytest
