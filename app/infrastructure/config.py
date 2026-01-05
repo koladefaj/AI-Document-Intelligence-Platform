@@ -11,7 +11,6 @@ class Settings(BaseSettings):
     app_name: str = Field(default="document-intelligence-backend")
 
     # --- 2. DATABASE & REDIS ---
-    # These are base strings from .env (usually containing 'localhost')
     database_url: str
     database_sync_url: str
     db_port: int
@@ -28,7 +27,6 @@ class Settings(BaseSettings):
     minio_secure: bool
     storage_type: str
 
-    
     # --- 3. AI & SECURITY ---
     gemini_api: str
     ai_provider: str 
@@ -38,26 +36,30 @@ class Settings(BaseSettings):
     refresh_token_expire_days: int
     jwt_algorithm: str
     
-    # --- AUTOMATIC HOST RESOLUTION ---
-    # This logic runs immediately when Settings() is initialized
     def __init__(self, **values):
         super().__init__(**values)
         
-        # Check if we are running inside a Docker container
-        # Docker automatically creates a '.dockerenv' file at the root
-        is_docker = os.path.exists('/.dockerenv')
+        # Better Docker detection - check multiple indicators
+        is_docker = (
+            os.path.exists('/.dockerenv') or 
+            os.path.exists('/proc/1/cgroup') and 
+            any('docker' in line for line in open('/proc/1/cgroup', 'r').readlines())
+        ) if os.name != 'nt' else False  # Never true on Windows (nt)
+        
+        # OR: Use an explicit environment variable instead
+        # is_docker = os.getenv('RUNNING_IN_DOCKER', 'false').lower() == 'true'
         
         if is_docker:
             logger.info("Docker environment detected. Routing traffic to service names.")
-            # Replace 'localhost' and '127.0.0.1' with Docker service names
             self.database_url = self.database_url.replace("localhost", "db").replace("127.0.0.1", "db")
             self.database_sync_url = self.database_sync_url.replace("localhost", "db").replace("127.0.0.1", "db")
             self.redis_url = self.redis_url.replace("localhost", "redis").replace("127.0.0.1", "redis")
             self.celery_broker_url = self.celery_broker_url.replace("localhost", "redis").replace("127.0.0.1", "redis")
             self.celery_result_backend = self.celery_result_backend.replace("localhost", "redis").replace("127.0.0.1", "redis")
             self.minio_endpoint = self.minio_endpoint.replace("localhost", "minio").replace("127.0.0.1", "minio")
+        else:
+            logger.info("Local environment detected. Using localhost for services.")
 
-    # Clean the API Key in case it has quotes from the .env file
     @field_validator("gemini_api", mode="after")
     @classmethod
     def clean_api_key(cls, v: str) -> str:

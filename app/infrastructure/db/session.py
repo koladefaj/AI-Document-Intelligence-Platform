@@ -9,24 +9,27 @@ from sqlalchemy.ext.asyncio import (
 # Initialize logger for async database events
 logger = logging.getLogger(__name__)
 
+# --- DATABASE URL CONFIGURATION ---
+# Get the base DATABASE_URL (sync version: postgresql://)
+db_url = os.getenv("DATABASE_URL")
+
+if not db_url:
+    raise ValueError("DATABASE_URL environment variable is not set")
+
+# Create async version for the application
+async_db = db_url.replace('postgresql://', 'postgresql+asyncpg://')
+
+# Keep sync version for Alembic (export this!)
+# db_url remains as the sync version
 
 # --- 1. ASYNC ENGINE CONFIGURATION ---
-# Dev Note: This uses 'database_url' (which should start with postgresql+asyncpg://)
-# echo=True is helpful in development to see the SQL being generated in your Docker logs.
-
-db_url = os.getenv("DATABASE_URL")
-aysnc_db = db_url.replace('postgresql://', 'postgresql+asyncpg://')
-
 engine = create_async_engine(
-    aysnc_db,
+    async_db,  # Use the async version
     echo=False,  # Set to True for SQL debugging
     pool_pre_ping=True,  # Vital for Docker container stability
 )
 
 # --- 2. ASYNC SESSION FACTORY ---
-# expire_on_commit=False is crucial for FastAPI. 
-# It prevents SQLAlchemy from trying to re-fetch data after a commit, 
-# which would fail in an async environment.
 AsyncSessionLocal = async_sessionmaker(
     engine,
     class_=AsyncSession,

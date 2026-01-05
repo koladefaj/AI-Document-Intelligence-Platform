@@ -1,4 +1,5 @@
 from logging.config import fileConfig
+import os
 
 from app.infrastructure.config import settings
 from sqlalchemy import engine_from_config
@@ -61,8 +62,13 @@ def run_migrations_online() -> None:
 
     configuration = config.get_section(config.config_ini_section, {})
 
+    database_url = os.getenv("DATABASE_URL")
 
-    configuration["sqlalchemy.url"] = settings.database_sync_url
+    if not database_url:
+        raise RuntimeError("DATABASE NOT SET")
+
+
+    configuration["sqlalchemy.url"] = database_url
 
 
 

@@ -5,7 +5,7 @@ services:
     build: .
     container_name: document_backend
     # Use --reload only in development to see code changes instantly
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+    command: alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000
     ports:
       - "8000:8000"
     env_file:
