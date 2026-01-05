@@ -1,7 +1,6 @@
 from logging.config import fileConfig
 import os
 
-from app.infrastructure.config import settings
 from sqlalchemy import engine_from_config
 from sqlalchemy import pool
 from app.infrastructure.db.models import Base
