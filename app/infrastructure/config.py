@@ -39,26 +39,31 @@ class Settings(BaseSettings):
     def __init__(self, **values):
         super().__init__(**values)
         
-        # Better Docker detection - check multiple indicators
-        is_docker = (
-            os.path.exists('/.dockerenv') or 
-            os.path.exists('/proc/1/cgroup') and 
-            any('docker' in line for line in open('/proc/1/cgroup', 'r').readlines())
-        ) if os.name != 'nt' else False  # Never true on Windows (nt)
+        # 1. Check for Railway FIRST. If we are on Railway, DO NOT touch the strings.
+        # Railway injects its own internal URLs which should be used as-is.
+        is_railway = os.environ.get('RAILWAY_ENVIRONMENT_ID') is not None
         
-        # OR: Use an explicit environment variable instead
-        # is_docker = os.getenv('RUNNING_IN_DOCKER', 'false').lower() == 'true'
+        # 2. Check for Docker (Local Compose)
+        is_docker = os.path.exists('/.dockerenv')
         
-        if is_docker:
-            logger.info("Docker environment detected. Routing traffic to service names.")
-            self.database_url = self.database_url.replace("localhost", "db").replace("127.0.0.1", "db")
-            self.database_sync_url = self.database_sync_url.replace("localhost", "db").replace("127.0.0.1", "db")
+        if is_railway:
+            logger.info("Railway environment detected. Using Dashboard variables as provided.")
+        elif is_docker:
+            logger.info("Local Docker detected. Routing traffic to service names (db, redis, minio).")
+            # Replace localhost with the service names defined in your docker-compose.yml
+            # Ensure your DB service in docker-compose is named 'db' or 'postgres_db'
+            target_db = "postgres_db" # Change to "db" if that's your service name
+            
+            self.database_url = self.database_url.replace("localhost", target_db).replace("127.0.0.1", target_db)
+            self.database_sync_url = self.database_sync_url.replace("localhost", target_db).replace("127.0.0.1", target_db)
+            
             self.redis_url = self.redis_url.replace("localhost", "redis").replace("127.0.0.1", "redis")
             self.celery_broker_url = self.celery_broker_url.replace("localhost", "redis").replace("127.0.0.1", "redis")
             self.celery_result_backend = self.celery_result_backend.replace("localhost", "redis").replace("127.0.0.1", "redis")
+            
             self.minio_endpoint = self.minio_endpoint.replace("localhost", "minio").replace("127.0.0.1", "minio")
         else:
-            logger.info("Local environment detected. Using localhost for services.")
+            logger.info("Local Windows/OS detected. Using localhost connections.")
 
     @field_validator("gemini_api", mode="after")
     @classmethod
@@ -66,6 +71,8 @@ class Settings(BaseSettings):
         return v.strip().strip('"').strip("'")
 
     model_config = SettingsConfigDict(
+        # This order is important: System Environment Variables (Railway) always 
+        # override the .env file (Local).
         env_file=".env" if os.path.exists(".env") else None,
         env_file_encoding="utf-8",
         extra="allow",
