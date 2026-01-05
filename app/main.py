@@ -1,6 +1,7 @@
 import uuid
 import os
 import logging
+from minio import Minio
 from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
@@ -115,3 +116,17 @@ def health_check(request: Request):
         "request_id": request.state.request_id,
         "environment": "docker-container"
     }
+
+@app.get("/test-minio")
+def test_minio():
+    client = Minio(
+        os.getenv("MINIO_ENDPOINT"),
+        access_key=os.getenv("MINIO_ROOT_USER"),
+        secret_key=os.getenv("MINIO_ROOT_PASSWORD"),
+        secure=False
+    )
+    try:
+        buckets = client.list_buckets()
+        return {"status": "connected", "buckets": [b.name for b in buckets]}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
