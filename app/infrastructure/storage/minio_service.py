@@ -11,35 +11,40 @@ logger = logging.getLogger(__name__)
 class MinioStorage(StorageInterface):
     """
     S3-Compatible Storage Provider using MinIO.
-    
-    Dev Note: This allows the application to be 'Cloud Ready'. 
-    You can swap MinIO for AWS S3 by simply changing the environment variables.
+    Optimized for Railway and Local Docker environments.
     """
     def __init__(self):
-        # Client initialization is synchronous
-        self.client = Minio(
-            settings.minio_endpoint,
-            access_key=settings.minio_access_key,
-            secret_key=settings.minio_secret_key,
-            secure=settings.minio_secure
+        # IMPORTANT: MinIO SDK expects 'host:port', not 'http://host:port'
+        # We strip any protocol prefixes just in case they exist in settings
+        clean_endpoint = (
+            settings.minio_endpoint
+            .replace("https://", "")
+            .replace("http://", "")
+            .strip("/")
         )
-        self.bucket = settings.minio_bucket
+
+        logger.info(f"MinIO: Initializing client with endpoint: {clean_endpoint}")
+
+        try:
+            self.client = Minio(
+                clean_endpoint,
+                access_key=settings.minio_access_key,
+                secret_key=settings.minio_secret_key,
+                # secure=True if using port 443/SSL, False for Railway private 9000
+                secure=settings.minio_secure 
+            )
+            self.bucket = settings.minio_bucket
+        except Exception as e:
+            logger.error(f"MinIO: Failed to initialize client: {str(e)}")
+            raise
 
     async def upload(self, file_id: str, file_name: str, file_bytes: bytes, content_type: str) -> str:
-        """
-        Uploads a file to the MinIO bucket.
-        
-        Dev Note: We use 'file_id' as the Object Name in MinIO to ensure 
-        consistency with the database and avoid issues with special characters in filenames.
-        """
-        is_secure = settings.minio_secure
+        """Uploads a file using the file_id as the unique object name."""
         try:
             self.ensure_bucket_exists(self.bucket)
             
-            # Wrap bytes in a stream for the MinIO SDK
             buffer = BytesIO(file_bytes)
 
-            # Dev Note: We store using 'file_id' (the UUID) so get_file_path can find it easily
             self.client.put_object(
                 bucket_name=self.bucket,
                 object_name=file_id, 
@@ -50,7 +55,8 @@ class MinioStorage(StorageInterface):
             
             logger.info(f"MinIO: Successfully uploaded {file_id} ({file_name})")
 
-            protocol = "https" if is_secure else "http"
+            # Return a formatted URL for reference
+            protocol = "https" if settings.minio_secure else "http"
             return f"{protocol}://{settings.minio_endpoint}/{self.bucket}/{file_id}"
             
         except Exception as e:
@@ -58,23 +64,15 @@ class MinioStorage(StorageInterface):
             raise
 
     async def get_file_path(self, file_id: str) -> str:
-        """
-        Provides a local filesystem path for the AI processor to read.
-        
-        Workflow:
-        1. Checks /tmp cache to avoid redundant downloads.
-        2. If missing, streams the object from MinIO to /tmp.
-        """
+        """Downloads file to /tmp for AI processing if not already cached."""
         temp_path = f"/tmp/{file_id}"
         
-        # Performance Check: Don't re-download if the worker already has it
         if os.path.exists(temp_path):
             logger.debug(f"MinIO Cache: File {file_id} already exists in /tmp")
             return temp_path
     
         try:
-            logger.info(f"MinIO: Downloading {file_id} to {temp_path} for processing")
-            # fget_object downloads the file directly to the specified path
+            logger.info(f"MinIO: Downloading {file_id} to {temp_path}")
             self.client.fget_object(self.bucket, file_id, temp_path)
             return temp_path
         except Exception as e:
@@ -82,7 +80,11 @@ class MinioStorage(StorageInterface):
             raise
 
     def ensure_bucket_exists(self, bucket_name: str):
-        """Standard check-and-create logic for the storage container."""
-        if not self.client.bucket_exists(bucket_name):
-            logger.info(f"MinIO: Creating missing bucket: {bucket_name}")
-            self.client.make_bucket(bucket_name)
+        """Ensures the storage bucket is ready for use."""
+        try:
+            if not self.client.bucket_exists(bucket_name):
+                logger.info(f"MinIO: Creating missing bucket: {bucket_name}")
+                self.client.make_bucket(bucket_name)
+        except Exception as e:
+            logger.error(f"MinIO Bucket Error: {str(e)}")
+            raise

@@ -11,7 +11,6 @@ class Settings(BaseSettings):
     app_name: str = Field(default="document-intelligence-backend")
 
     # --- 2. DATABASE & REDIS ---
-    # These are base strings from .env (usually containing 'localhost')
     database_url: str
     database_sync_url: str
     db_port: int
@@ -28,7 +27,6 @@ class Settings(BaseSettings):
     minio_secure: bool
     storage_type: str
 
-    
     # --- 3. AI & SECURITY ---
     gemini_api: str
     ai_provider: str 
@@ -39,23 +37,32 @@ class Settings(BaseSettings):
     jwt_algorithm: str
     
     # --- AUTOMATIC HOST RESOLUTION ---
-    # This logic runs immediately when Settings() is initialized
     def __init__(self, **values):
         super().__init__(**values)
         
-        # Check if we are running inside a Docker container
-        # Docker automatically creates a '.dockerenv' file at the root
+        # 1. Detect Environment
         is_docker = os.path.exists('/.dockerenv')
+        # Railway sets RAILWAY_ENVIRONMENT_ID automatically
+        is_railway = os.environ.get('RAILWAY_ENVIRONMENT_ID') is not None
         
-        if is_docker:
-            logger.info("Docker environment detected. Routing traffic to service names.")
-            # Replace 'localhost' and '127.0.0.1' with Docker service names
+        # 2. Only apply "Service Name" replacements if we are in LOCAL Docker
+        # On Railway, the dashboard variables should be used exactly as they are.
+        if is_docker and not is_railway:
+            logger.info("Local Docker detected. Routing traffic to internal service names (db, redis, minio).")
+            
             self.database_url = self.database_url.replace("localhost", "db").replace("127.0.0.1", "db")
             self.database_sync_url = self.database_sync_url.replace("localhost", "db").replace("127.0.0.1", "db")
+            
             self.redis_url = self.redis_url.replace("localhost", "redis").replace("127.0.0.1", "redis")
             self.celery_broker_url = self.celery_broker_url.replace("localhost", "redis").replace("127.0.0.1", "redis")
             self.celery_result_backend = self.celery_result_backend.replace("localhost", "redis").replace("127.0.0.1", "redis")
+            
             self.minio_endpoint = self.minio_endpoint.replace("localhost", "minio").replace("127.0.0.1", "minio")
+        
+        elif is_railway:
+            logger.info("Railway environment detected. Using Dashboard provided variables.")
+        else:
+            logger.info("Local machine (non-docker) detected. Using localhost/127.0.0.1.")
 
     # Clean the API Key in case it has quotes from the .env file
     @field_validator("gemini_api", mode="after")
