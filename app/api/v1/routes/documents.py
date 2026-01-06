@@ -2,7 +2,8 @@ import logging
 from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette import status
-
+from sqlalchemy import select
+from uuid import UUID
 from app.infrastructure.db.session import get_session
 from app.infrastructure.auth.dependencies import get_current_user
 from app.application.use_case.upload_document import handle_upload
