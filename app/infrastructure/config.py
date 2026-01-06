@@ -69,8 +69,10 @@ class Settings(BaseSettings):
             self.redis_url = self.redis_url.replace("localhost", "redis").replace("127.0.0.1", "redis")
             self.celery_broker_url = self.celery_broker_url.replace("localhost", "redis").replace("127.0.0.1", "redis")
             self.celery_result_backend = self.celery_result_backend.replace("localhost", "redis").replace("127.0.0.1", "redis")
-            
-            self.minio_endpoint = self.minio_endpoint.replace("localhost", "minio").replace("127.0.0.1", "minio")
+
+            if self.minio_endpoint:
+                self.minio_endpoint = self.minio_endpoint.replace("localhost", "minio").replace("127.0.0.1", "minio")
+                
         else:
             logger.info("Local Windows/OS detected. Using localhost connections.")
 
