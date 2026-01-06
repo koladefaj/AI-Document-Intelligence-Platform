@@ -11,21 +11,21 @@ class Settings(BaseSettings):
     app_name: str = Field(default="document-intelligence-backend")
 
     # --- 2. DATABASE & REDIS ---
-    database_url: str
-    database_sync_url: str
-    db_port: int
-    redis_url: str
-    redis_port: int
-    celery_broker_url: str
-    celery_result_backend: str
-    minio_endpoint: str
-    minio_bucket: str
-    minio_access_key: str
-    minio_secret_key: str
-    minio_api_port: int
-    minio_console_port: int
-    minio_secure: bool
-    storage_type: str
+    database_url: str | None = None
+    database_sync_url: str | None = None
+    db_port: int | None = None
+    redis_url: str | None = None
+    redis_port: int | None = None
+    celery_broker_url: str | None = None
+    celery_result_backend: str | None = None
+    minio_endpoint: str | None = None
+    minio_bucket: str | None = None
+    minio_access_key: str | None = None
+    minio_secret_key: str | None = None
+    minio_api_port: int | None = None
+    minio_console_port: int | None = None
+    minio_secure: bool | None = None
+    storage_type: str | None = None
 
     # --- R2 S3 --- #
 
@@ -36,13 +36,13 @@ class Settings(BaseSettings):
     s3_region: str = "auto"
 
     # --- 3. AI & SECURITY ---
-    gemini_api: str
-    ai_provider: str 
-    ollama_model: str
-    secret_key: str
-    access_token_expire_minutes: int
-    refresh_token_expire_days: int
-    jwt_algorithm: str
+    gemini_api: str | None = None
+    ai_provider: str | None = None
+    ollama_model: str | None = None
+    secret_key: str | None = None
+    access_token_expire_minutes: int | None = None
+    refresh_token_expire_days: int | None = None
+    jwt_algorithm: str | None = None
     
     def __init__(self, **values):
         super().__init__(**values)
