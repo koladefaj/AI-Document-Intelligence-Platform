@@ -36,7 +36,7 @@ class R2Storage(StorageInterface):
                 ContentType=content_type
             )
 
-            logger.info(f"R2: Uploaded {file_id} ({file_id})")
+            logger.info(f'R2: Uploaded {file_id} ({file_id})')
 
             return file_id
         
