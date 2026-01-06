@@ -29,10 +29,10 @@ class Settings(BaseSettings):
 
     # --- R2 S3 --- #
 
-    s3_endpoint: str
-    s3_access_key: str
-    s3_secret_key: str
-    s3_bucket: str
+    s3_endpoint: str | None = None
+    s3_access_key: str | None = None
+    s3_secret_key: str | None = None
+    s3_bucket: str | None = None
     s3_region: str = "auto"
 
     # --- 3. AI & SECURITY ---
