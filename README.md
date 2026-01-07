@@ -49,6 +49,7 @@ A high-performance, asynchronous document analysis system built with **FastAPI**
 
 - Python 3.10+
 - PostgreSQL & Redis
+- Poetry
 - An Ollama instance running (locally or on Railway)
 
 ### Environment Variables
@@ -110,13 +111,13 @@ OLLAMA_MODEL="qwen2.5:1.5b"
 ### Installation Steps
 1.  **Clone the Repository:**
     ```bash
-    git clone https://github.com/youruser/yourproject.git
-    cd yourproject
+    git clone https://github.com/koladefaj/AI-Document-Intelligence-Platform.git
+    cd AI-Document-Intelligence-Platform
     ```
 
 2.  **Install Dependencies:**
     ```bash
-    pip install -r requirements.txt
+    poetry install
     ```
 
 3. **Run Database Migration**
@@ -126,12 +127,12 @@ OLLAMA_MODEL="qwen2.5:1.5b"
 
 4. **Start the API**
     ```bash
-    uvicorn app.main:app --reload
+    poetry run uvicorn app.main:app --reload
     ```
 
 7. **Start the Celery Worker**
     ```bash
-    celery -A app.worker worker --loglevel=info
+    poetry run celery -A app.worker worker --loglevel=info
     ```
 ---
 ## 🧪 Testing & CI/CD
