@@ -5,35 +5,6 @@
 
 A high-performance, asynchronous document analysis system built with **FastAPI**, **Celery**, and **Ollama**. This platform allows users to upload **PDF (including scanned), DOCX, TXT, and XLSX** files, performs OCR when needed, and generates **AI-driven summaries** using local LLMs.
 
----
-
-### Demo
-**1️⃣ Register User**  
-<video width="600" controls>
-  <source src="assets/demo-upload.mp4" type="video/mp4">
-  Your browser does not support the video tag.
-</video>
-![Register User](assets/demo-register.mp4)
-
-**2️⃣ Login User**  
-![Login User](assets/demo-login.mp4)
-
-**3️⃣ Upload Document**  
-![Upload Document](assets/demo-upload.mp4)
-
-**4️⃣ Task Status**  
-![Task Status](assets/demo-task-status.mp4)
-
-**5️⃣AI Summary**  
-![AI Summary](assets/demo-summary.mp4)
-
-**6️⃣ Edit Password**  
-![Edit Password](assets/demo-edit-password.mp4)
-
-**7️⃣ Delete Account**  
-![Delete Account](assets/demo-delete.mp4)
-
-
 
 ---
 
