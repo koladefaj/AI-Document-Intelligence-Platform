@@ -47,7 +47,7 @@ def process_document_task(self, document_id: str, request_id: str = "worker-gen"
         logger.info(f"Verification successful. Starting AI analysis for {doc.file_name}")
         
         # FIXED: Use process_sync for Celery (synchronous context)
-        result = processor.process_sync(path_to_process, mime_type=doc.content_type)
+        result = processor.process_sync(path_to_process, mime_type=doc.content)
 
         # Update document
         doc.raw_text = result.get("raw_text", "")
