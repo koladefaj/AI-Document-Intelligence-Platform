@@ -88,7 +88,15 @@ class DocumentProcessor(DocumentProcessorInterface):
 
                     except Exception as e:
                         logger.error(f"OCR processing failed: {e}", exc_info=True)
-                        text = "[This appears to be a scanned PDF. OCR could not process it.]"
+                        raise ProcessingError(f"Text extraction error: {e}")
+                    
+                    if text:
+                        text = text.replace("\x00", "")
+                        text = "".join(char for char in text if char.isprintable() or char in "\n\r\t")
+
+                    return text
+                    
+
 
 
             elif is_docx:
@@ -122,9 +130,7 @@ class DocumentProcessor(DocumentProcessorInterface):
 
         return text
 
-    # ------------------------------------------------------------------
     # GEMINI (ASYNC)
-    # ------------------------------------------------------------------
     @retry(
         stop=stop_after_attempt(5),
         wait=wait_exponential(multiplier=2, min=10, max=60),
@@ -162,9 +168,7 @@ class DocumentProcessor(DocumentProcessorInterface):
                 raise Exception("Gemini Rate Limit")
             raise Exception(f"Gemini error: {e}")
 
-    # ------------------------------------------------------------------
     # OLLAMA (SYNC – CELERY SAFE)
-    # ------------------------------------------------------------------
     def _get_ollama_summary_sync(self, file_path: str, mime_type: str | None = None) -> str:
         try:
             extracted_text = self._extract_text_metadata(file_path, mime_type)

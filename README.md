@@ -51,6 +51,9 @@ A high-performance, asynchronous document analysis system built with **FastAPI**
 - PostgreSQL & Redis
 - Poetry
 - An Ollama instance running (locally or on Railway)
+- tesseract-ocr
+- libtesseract-dev
+- poppler-utils
 
 ### Environment Variables
 
