@@ -151,7 +151,7 @@ pytest
 |------|--------|-----------|
 |POST|/auth/register|Register a new user|
 |POST|/auth/login|Login and get JWT tokens|
-|PATCH|/auth/change-password|Update account password|
+|POST|/auth/change-password|Update account password|
 |DELETE|/auth/delete-account|Delete user account|
 |POST|/documents/upload|Upload PDF/DOCX/TXT/XLSX for AI analysis|
 |GET|/documents/{document_id}|Get status and AI summary result|
