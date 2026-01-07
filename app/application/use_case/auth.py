@@ -71,3 +71,32 @@ async def login(
         "refresh_token": create_refresh_token(user),
         "token_type": "bearer"
     }
+
+async def delete_user(session: AsyncSession, user_id: str) -> None:
+    result = await session.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise AuthenticationFailed("User not found.")
+    
+    # Soft delete
+    user.is_active = False
+    user.email = f"deleted_{user.id}@example.com"  # anonymize
+    user.hashed_password = None
+    
+    await session.commit()
+    logger.info(f"User account {user_id} deactivated")
+
+
+async def change_password(session: AsyncSession, user_id: str, old_password: str, new_password: str) -> None:
+    result = await session.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise AuthenticationFailed("User not found.")
+
+    if not verify_password(old_password, user.hashed_password):
+        raise AuthenticationFailed("Old password is incorrect.")
+
+    user.hashed_password = hash_password(new_password)
+    await session.commit()
+    logger.info(f"Password updated for user {user_id}")
+

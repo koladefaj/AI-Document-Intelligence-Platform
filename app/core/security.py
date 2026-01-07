@@ -1,40 +1,41 @@
-import magic
 import logging
 from fastapi import HTTPException, status, UploadFile
+import magic  
 
 # Initialize logger for security events
 logger = logging.getLogger(__name__)
 
 # --- 1. CONFIGURATION ---
-# Dev Note: We explicitly map MIME types to allowed extensions.
-# This prevents 'Polyglot' files (files that are valid in two different formats).
+# Allowed MIME types mapped to valid extensions
 ALLOWED_MIME_TYPES = {
     "application/pdf": [".pdf"],
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document": [".docx"],
     "application/msword": [".doc"],
     "text/plain": [".txt"],
-    "application/zip": [".docx", ".zip"]  # Word files are technically ZIP structures
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [".xlsx"],
+    "application/vnd.ms-excel": [".xls"],
+    "text/csv": [".csv"],
+    "application/zip": [".docx", ".xlsx", ".zip"],  # ZIP-based office files
 }
 
-# Max file size: 10MB (Standard for document processing tasks)
-MAX_FILE_SIZE = 10 * 1024 * 1024 
+# Max file size: 10MB
+MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
 
 async def validate_file_content(file: UploadFile):
     """
-    Performs multi-stage validation on uploaded files.
-    
-    1. Size Check: Prevents RAM exhaustion (DoS attacks).
-    2. Magic Byte Check: Identifies real file type via binary headers.
-    3. Extension Check: Ensures filename extension matches binary content.
+    Validates uploaded files:
+    1. Size Check
+    2. MIME type check via magic bytes
+    3. Extension consistency check
     """
-    
+
     # --- STAGE 1: SIZE VALIDATION ---
     file_size = 0
-    if file.size:
+    if hasattr(file, "size") and file.size:
         file_size = file.size
     else:
-        # Fallback for clients with missing headers
-        await file.seek(0, 2)
+        # Fallback for clients without size headers
+        await file.seek(0, 2)  # move to end
         file_size = await file.tell()
         await file.seek(0)
 
@@ -46,11 +47,9 @@ async def validate_file_content(file: UploadFile):
         )
 
     # --- STAGE 2: CONTENT VALIDATION (Magic Bytes) ---
-    # We only read the first 2KB. This is enough to identify 99% of file types
-    # without loading the entire file into memory.
-    header = await file.read(2048)
+    header = await file.read(2048)  # first 2KB is enough
     file_mime_type = magic.from_buffer(header, mime=True)
-    await file.seek(0) # Critical: Reset cursor so the next service can read from the start
+    await file.seek(0)  # reset for next service
 
     if file_mime_type not in ALLOWED_MIME_TYPES:
         logger.error(f"Security: Rejected unsupported MIME type: {file_mime_type}")
@@ -60,15 +59,15 @@ async def validate_file_content(file: UploadFile):
         )
 
     # --- STAGE 3: EXTENSION CONSISTENCY ---
-    # Prevents 'Masquerading' (e.g., a file named 'virus.pdf' that is actually a .sh script)
     file_ext = "." + file.filename.split(".")[-1].lower() if file.filename else ""
     if file_ext not in ALLOWED_MIME_TYPES[file_mime_type]:
-        logger.error(f"Security: Extension mismatch. {file_ext} vs {file_mime_type}")
+        logger.error(f"Security: Extension mismatch: {file_ext} vs {file_mime_type}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="File extension does not match the actual file content."
         )
 
-    # Final cursor reset for the Storage/Upload service
+    # Final cursor reset for downstream processing
     await file.seek(0)
+    logger.info(f"Security: File {file.filename} passed validation ({file_mime_type})")
     return True

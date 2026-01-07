@@ -1,8 +1,12 @@
 import logging
-from fastapi import Depends, HTTPException, APIRouter, Request
+from fastapi import Depends, HTTPException, APIRouter, Request, Body
+from app.infrastructure.db.models import User
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette import status
 from app.api.v1.schemas import RegisterRequest, LoginRequest
+from app.application.use_case.auth import change_password as change_password_uc
+from app.application.use_case.auth import delete_user as delete_user_uc
+from app.infrastructure.auth.dependencies import get_current_user
 from app.infrastructure.db.session import get_session
 from app.application.use_case.auth import register_user as register_uc, login as login_uc
 from app.domain.exceptions import AuthenticationFailed
@@ -82,3 +86,65 @@ async def login_user_route(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
             detail="An error occurred during login."
         )
+    
+@router.post("/change-password", status_code=status.HTTP_200_OK)
+async def change_password_route(
+    request: Request,
+    old_password: str = Body(...),
+    new_password: str = Body(...),
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(get_current_user),  # fetched from JWT
+):
+    """
+    Allows the currently logged-in user to update their password.
+    Security:
+        - Must provide the old password
+        - Logs the change for audit
+        - Invalidates active sessions (optional)
+    """
+    try:
+        await change_password_uc(
+            session=session,
+            user_id=current_user.id,
+            old_password=old_password,
+            new_password=new_password
+        )
+        logger.info(f"Auth: Password changed for user {current_user.email}")
+        return {"message": "Password updated successfully"}
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Auth Critical: Change password failed for {current_user.email}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Could not change password."
+        )
+
+
+@router.delete("/delete-account", status_code=status.HTTP_200_OK)
+async def delete_account_route(
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Deletes or deactivates the current user's account.
+    Security:
+        - Must be authenticated
+        - Soft delete recommended for audit/logging purposes
+    """
+    try:
+        await delete_user_uc(session=session, user_id=current_user.id)
+        logger.info(f"Auth: Account deleted for user {current_user.email}")
+        return {"message": "Account successfully deleted"}
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Auth Critical: Delete account failed for {current_user.email}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Could not delete account."
+        )
+
