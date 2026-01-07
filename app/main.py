@@ -19,9 +19,24 @@ allowed = os.getenv("ALLOWED_HOSTS", "*").split(",")
 
 app = FastAPI(
     title="Document Intelligence Backend",
-    description="AI-powered document analysis service using Gemini and Ollama.",
+    description="""
+AI-powered document analysis service using Gemini and Ollama.
+
+**Supported Document Formats:**
+- PDF (.pdf)
+- Word Documents (.docx, .doc)
+- Excel Spreadsheets (.xlsx, .xls)
+- CSV (.csv)
+- Plain Text (.txt)
+
+**Features:**
+- Extract text and metadata from supported documents
+- Analyze content and generate insights
+- Supports scanned PDFs via OCR
+""",
     version="1.0.0"
 )
+
 
 # --- 1. RATE LIMITING ---
 # Dev Note: Limits requests to prevent API abuse. 
