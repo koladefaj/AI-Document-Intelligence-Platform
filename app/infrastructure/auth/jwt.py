@@ -15,7 +15,7 @@ def create_access_token(user) -> str:
     - email: Included for quick frontend display without a DB lookup
     - exp: Expiration timestamp (Default: 20 minutes)
     
-    Dev Note: Access tokens should be short-lived to minimize damage if stolen.
+    Access tokens should be short-lived to minimize damage if stolen.
     """
     expire = datetime.utcnow() + timedelta(
         minutes=settings.access_token_expire_minutes
