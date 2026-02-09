@@ -15,7 +15,7 @@ class Base(DeclarativeBase):
 class User(Base):
     __tablename__ = "users"
 
-    # Dev Note: Using native UUID type for better performance in Postgres
+    # Using native UUID type for better performance in Postgres
     id: Mapped[uuid.UUID] = mapped_column(
         primary_key=True,
         default=uuid.uuid4,
