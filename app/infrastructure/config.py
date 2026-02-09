@@ -60,7 +60,7 @@ class Settings(BaseSettings):
         elif is_docker:
             logger.info("Local Docker detected. Routing traffic to service names (db, redis, minio).")
             # Replace localhost with the service names defined in your docker-compose.yml
-            # Ensure your DB service in docker-compose is named 'db' or 'postgres_db'
+            # Ensure DB service in docker-compose is named 'db' or 'postgres_db'
             target_db = "postgres_db" # Change to "db" if that's your service name
             
             self.database_url = self.database_url.replace("localhost", target_db).replace("127.0.0.1", target_db)
