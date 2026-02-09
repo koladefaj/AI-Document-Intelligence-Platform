@@ -25,10 +25,6 @@ limiter = Limiter(
 )
 
 def init_limiter_error_handlers(app):
-    """
-    Optional: Registers a custom error handler to return 
-    a clean JSON response when a user is rate-limited.
-    """
     from fastapi import Request
     from fastapi.responses import JSONResponse
     from slowapi.errors import RateLimitExceeded
