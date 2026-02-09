@@ -58,5 +58,4 @@ def setup_logging():
         
     root_logger.addHandler(handler)
 
-    # Optional: Silence noisy third-party libraries (e.g., urllib3, boto3)
     logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
