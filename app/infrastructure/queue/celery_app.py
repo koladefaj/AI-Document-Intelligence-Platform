@@ -34,8 +34,6 @@ celery_app.conf.update(
     # Ensures the worker only takes one task at a time (better for heavy AI workloads)
     worker_prefetch_multiplier=1,
     
-    # Optional: Automatically discover tasks in the workers folder
-    # celery_app.autodiscover_tasks(['app.workers']),
 )
 
 # Dev Note: This check helps a developer verify Redis connectivity during startup
