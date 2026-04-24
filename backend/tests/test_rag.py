@@ -1,6 +1,5 @@
 import pytest
-from unittest.mock import MagicMock, patch
-from fastapi.testclient import TestClient
+from unittest.mock import patch
 from uuid import uuid4
 
 @pytest.fixture

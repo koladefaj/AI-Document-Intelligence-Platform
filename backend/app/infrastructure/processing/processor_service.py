@@ -1,5 +1,4 @@
 import os
-import uuid
 import logging
 import asyncio
 import pandas as pd
@@ -10,17 +9,7 @@ from pypdf import PdfReader
 from google import genai
 from docx import Document as DocxReader
 from pdf2image import convert_from_path
-from llama_index.core import Settings, VectorStoreIndex, Document as LlamaDocument
-from llama_index.core.node_parser import SentenceSplitter
-from llama_index.llms.gemini import Gemini
-from llama_index.llms.ollama import Ollama
-from llama_index.embeddings.gemini import GeminiEmbedding
-from llama_index.embeddings.ollama import OllamaEmbedding
 
-from sqlalchemy import select, func, text
-from sqlalchemy.orm import Session
-from app.infrastructure.db.models import DocumentEmbedding, Document as DocumentModel
-from app.infrastructure.db.session_sync import SessionLocal
 
 from app.infrastructure.config import settings
 from app.domain.exceptions import ProcessingError

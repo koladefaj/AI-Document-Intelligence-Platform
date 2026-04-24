@@ -1,9 +1,9 @@
 import logging
 import asyncio
 from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, Request
+from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette import status
-from sqlalchemy import select
 from uuid import UUID
 from app.api.v1.schemas import DocumentAnalysisResponse, DocumentUploadResponse, QueryRequest, QueryResponse
 from app.infrastructure.db.session import get_session
@@ -11,11 +11,10 @@ from app.infrastructure.auth.dependencies import get_current_user
 from app.application.use_case.upload_document import handle_upload
 from app.application.use_case.process_document import queue_processing
 from app.domain.services.storage_interface import StorageInterface
-from app.dependencies import get_storage_service, get_document_processor, get_rag_service
+from app.dependencies import get_storage_service, get_rag_service
 from app.core.security import validate_file_content
 from app.domain.exceptions import AuthenticationFailed
 from app.core.limiter import limiter
-from app.infrastructure.db.models import Document
 from app.infrastructure.db.repository import DocumentRepository
 
 # Initialize logger
@@ -174,7 +173,6 @@ async def query_document(
             detail="An error occurred while querying the document."
         )
 
-from fastapi.responses import StreamingResponse
 
 @router.get("/{document_id}/chat")
 async def get_chat_history(

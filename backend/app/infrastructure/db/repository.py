@@ -1,7 +1,7 @@
 from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.infrastructure.db.models import Document
+from app.infrastructure.db.models import Document, ChatMessage
 
 class DocumentRepository:
     def __init__(self, session: AsyncSession):
@@ -24,8 +24,7 @@ class DocumentRepository:
         await self.session.commit()
 
     # --- CHAT PERSISTENCE ---
-    async def get_chat_history(self, doc_id: UUID, user_id: UUID) -> list["ChatMessage"]:
-        from app.infrastructure.db.models import ChatMessage
+    async def get_chat_history(self, doc_id: UUID, user_id: UUID) -> list[ChatMessage]:
         result = await self.session.execute(
             select(ChatMessage)
             .where(ChatMessage.document_id == doc_id, ChatMessage.user_id == user_id)
@@ -33,8 +32,7 @@ class DocumentRepository:
         )
         return result.scalars().all()
 
-    async def add_chat_message(self, doc_id: UUID, user_id: UUID, role: str, content: str) -> "ChatMessage":
-        from app.infrastructure.db.models import ChatMessage
+    async def add_chat_message(self, doc_id: UUID, user_id: UUID, role: str, content: str) -> ChatMessage:
         msg = ChatMessage(document_id=doc_id, user_id=user_id, role=role, content=content)
         self.session.add(msg)
         await self.session.commit()

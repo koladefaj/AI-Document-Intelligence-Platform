@@ -3,15 +3,6 @@ import os
 import logging
 import warnings
 from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
-
-# --- WARNING SUPPRESSION (CRITICAL FOR CLEAN LOGS) ---
-# Suppress Pydantic v2 validation warnings from dependencies
-warnings.filterwarnings("ignore", category=UserWarning, module="pydantic")
-# Suppress LlamaIndex/Google deprecation warnings
-warnings.filterwarnings("ignore", category=FutureWarning, module="llama_index")
-# Suppress Celery root warnings
-os.environ["C_FORCE_ROOT"] = "true"
-
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from app.api.v1.websocket_manager import manager
@@ -21,6 +12,14 @@ from app.core.limiter import limiter
 from app.infrastructure.config import settings
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
+
+# --- WARNING SUPPRESSION (CRITICAL FOR CLEAN LOGS) ---
+# Suppress Pydantic v2 validation warnings from dependencies
+warnings.filterwarnings("ignore", category=UserWarning, module="pydantic")
+# Suppress LlamaIndex/Google deprecation warnings
+warnings.filterwarnings("ignore", category=FutureWarning, module="llama_index")
+# Suppress Celery root warnings
+os.environ["C_FORCE_ROOT"] = "true"
 
 # Initialize centralized logging configuration
 setup_logging()

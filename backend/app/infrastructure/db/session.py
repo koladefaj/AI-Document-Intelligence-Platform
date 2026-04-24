@@ -1,5 +1,4 @@
 import logging
-import os
 from app.infrastructure.config import settings
 from typing import AsyncGenerator
 from sqlalchemy.ext.asyncio import (

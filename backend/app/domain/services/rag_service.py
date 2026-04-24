@@ -2,7 +2,6 @@ import uuid
 import logging
 from sqlalchemy import select
 from sqlalchemy.orm import Session
-from pgvector.sqlalchemy import VECTOR
 from app.infrastructure.db.models import DocumentEmbedding
 from app.infrastructure.config import settings
 from llama_index.core import Settings

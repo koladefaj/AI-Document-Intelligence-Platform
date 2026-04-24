@@ -4,6 +4,7 @@ from typing import Optional
 
 from sqlalchemy import String, Boolean, ForeignKey, Text, DateTime, JSON, Index, BigInteger
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+from pgvector.sqlalchemy import VECTOR
 
 class Base(DeclarativeBase):
     """
@@ -117,7 +118,6 @@ class ChatMessage(Base):
     # Relationships
     document: Mapped["Document"] = relationship("Document", back_populates="chats")
 
-from pgvector.sqlalchemy import VECTOR
 
 class DocumentEmbedding(Base):
     """
