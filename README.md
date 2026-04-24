@@ -1,45 +1,51 @@
-# AI Document Intelligence Platform
+# AI Document Intelligence & RAG Platform
 
-[Live Demo: AI Document Intelligence API](https://document-intelligence-backend-production.up.railway.app/docs)
+[Live Demo: Swagger UI](http://localhost:8000/docs) (Local Only)
 
-
-A high-performance, asynchronous document analysis system built with **FastAPI**, **Celery**, and **Ollama**. This platform allows users to upload **PDF (including scanned), DOCX, TXT, and XLSX** files, performs OCR when needed, and generates **AI-driven summaries** using local LLMs.
-
+A high-performance, asynchronous Document Intelligence and **Retrieval-Augmented Generation (RAG)** platform. Built with **FastAPI**, **Celery**, and **Ollama**, this system allows users to transform static documents into interactive, searchable AI assets.
 
 ---
 
-## 🚀 Features
+## 🚀 Key Features
 
-- **User Management**: Secure authentication (JWT), user registration, password editing, and account deletion.
-- **Intelligent Uploads**: Multi-format support (**PDF, DOCX, TXT, XLSX**) with **magic byte validation** to prevent spoofed files. Secure storage in **Cloudflare R2**. CORS enabled for web clients.
-- **OCR Engine**: Automatic **Optical Character Recognition** for scanned PDFs, ensuring AI can read text from images.
-- **Background Processing**: Celery-powered task queue to handle heavy AI workloads asynchronously.
-- **Local AI Analysis**: Integration with **Ollama** (Qwen2.5/Llama3) for **private, secure document summarization**.
-- **Scalable Infrastructure**: Designed for deployment on Railway with separate services for the API, Worker, and Database.
-
----
-## 🔹 Tech Highlights
-
-* **Pydantic**: Ensures type-safe request validation and response serialization.
-* **Dependency Injection**: Promotes modular, testable, and maintainable code, especially for DB sessions, authentication, and services.
-* **Security**: JWT Auth, magic-byte file validation, rate limiting, and CORS protection.
+- **Advanced RAG Engine**: Perform semantic search and contextual Q&A across your entire document library.
+- **ORM-Native Vector Store**: High-performance vector storage in PostgreSQL using `pgvector` with `HNSW` indexing for sub-second similarity retrieval.
+- **Architecture Decoupling**: Built using **Dependency Injection** (DI) and interface patterns, allowing for hot-swapping storage providers (Local, MinIO, R2) and AI models.
+- **Intelligent Deduplication**: Uses **SHA-256 content hashing** to instantly identify duplicate files, skipping expensive AI processing and cloning results.
+- **Hardware Acceleration**: Native support for **NVIDIA GPU Offloading** (RTX 4060+) when using local Ollama.
+- **OCR Engine**: Automatic Tesseract-powered OCR for scanned PDFs and images.
+- **Usage Tracking**: Per-user token consumption monitoring and quota management.
 
 ---
 
-## 🏗️ Architecture
+## 🛡️ Resilience & Task Reliability
 
-- **FastAPI**: Entry point for all requests and Swagger UI.
-- **PostgreSQL**: Stores user metadata, document status, and AI analysis results.
-- **Cloudflare R2**: S3-compatible object storage for physical file persistence.
-- **Redis**: Message broker between the API and the Worker.
-- **Celery Worker**: Performs OCR and communicates with the Ollama API.
-- **Ollama**: Hosts the LLM (e.g., Qwen2.5:1.5b) on a dedicated internal service.
+The platform is designed for **Zero Data Loss** and high availability in the background processing pipeline:
+
+- **Late Acknowledgement**: Workers use `task_acks_late=True`, ensuring a task is only removed from the queue *after* successful completion. If a worker crashes mid-task, it is automatically re-queued.
+- **Visibility Timeout**: Configured at 2 hours to ensure long-running document analysis tasks aren't accidentally redelivered.
+- **Graceful Retries**: 
+    - **Transient Errors** (Rate limits, timeouts): Automatically retried with **Exponential Backoff** (1m, 2m, 4m...).
+    - **Permanent Errors** (Missing files, invalid formats): Gracefully failed and reported to the user to prevent queue clogging.
 
 ---
 
-### 🚀 Deployment Overview
-![Railway Microservices Setup](assets/railway-screenshot.png)
-*Microservice architecture deployed on Railway showing API, Worker, Database, Redis, and AI services.*
+## ⚡ Optimization Techniques
+
+- **Batch Embedding**: High-throughput vector generation using batch requests to AI providers, reducing network latency and overhead.
+- **Lazy Loading**: Services are initialized only when needed (Lazy Singletons), reducing the initial memory footprint of the API and Workers.
+- **Connection Pooling**: Optimized database and Redis connection pooling for high-concurrency workloads.
+
+---
+
+## 🏗️ Technical Stack
+
+* **Backend**: FastAPI (Async Python 3.10+)
+* **Task Queue**: Celery + Redis
+* **Vector DB**: PostgreSQL + `pgvector` + `HNSW` Indexing
+* **AI Engine**: Ollama (Local) & Gemini (Cloud)
+* **Storage**: Multi-provider support (S3, R2, MinIO, Local FS)
+* **OCR**: Tesseract OCR & Poppler
 
 ---
 
@@ -47,142 +53,57 @@ A high-performance, asynchronous document analysis system built with **FastAPI**
 
 ### Prerequisites
 
-- Python 3.10+
-- PostgreSQL & Redis
-- Poetry
-- An Ollama instance running (locally or on Railway)
-- tesseract-ocr
-- libtesseract-dev
-- poppler-utils
+1.  **Python 3.10+**
+2.  **PostgreSQL** (with `pgvector` extension)
+3.  **Redis** (for Celery)
+4.  **Tesseract OCR** (`apt install tesseract-ocr`)
+5.  **Ollama** (Required for local AI processing - [Download here](https://ollama.com/))
 
-### Environment Variables
+### Installation
 
-Create a `.env` file in the root directory or copy `.env.example`:
-
-```bash
-# Application Environment
-APP_ENV=production
-USE_MINIO=false
-
-# Database
-DATABASE_URL=postgresql+asyncpg://user:pass@host:port/dbname
-DATABASE_SYNC_URL=postgresql://user:pass@host:port/dbname
-DATABASE_USERNAME=user
-DATABASE_PASSWORD=pass
-DB_PORT=5432
-
-# Redis
-REDIS_URL=redis://host:port/0
-REDIS_PORT=6379
-
-# JWT
-SECRET_KEY='your-secret-key'
-ACCESS_TOKEN_EXPIRE_MINUTES=15
-REFRESH_TOKEN_EXPIRE_DAYS=7
-JWT_ALGORITHM="HS256"
-
-# Gemini API
-GEMINI_API="your-gemini-api-key"
-
-# Storage
-STORAGE_TYPE=r2
-S3_BUCKET=document-bucket
-S3_ENDPOINT=https://<accountid>.r2.cloudflarestorage.com
-S3_ACCESS_KEY=<access-key>
-S3_SECRET_KEY=<secret-key>
-
-# MinIO (optional)
-MINIO_ENDPOINT=minio:9000
-MINIO_ACCESS_KEY=minioadmin
-MINIO_SECRET_KEY=minioadmin
-MINIO_BUCKET=document-bucket
-MINIO_SECURE=False
-MINIO_API_PORT=9000
-MINIO_CONSOLE_PORT=9001
-
-# Celery
-CELERY_BROKER_URL=redis://redis:6379/0
-CELERY_RESULT_BACKEND=redis://redis:6379/0
-
-# AI Provider
-AI_PROVIDER="ollama"
-OLLAMA_MODEL="qwen2.5:1.5b"
-```
-
----
-
-### Installation Steps
-1.  **Clone the Repository:**
-    ```bash
-    git clone https://github.com/koladefaj/AI-Document-Intelligence-Platform.git
-    cd AI-Document-Intelligence-Platform
-    ```
-
-2.  **Install Dependencies:**
+1.  **Install Dependencies:**
     ```bash
     poetry install
     ```
 
-3. **Run Database Migration**
+2.  **Database Migration:**
     ```bash
     alembic upgrade head
     ```
 
-4. **Start the API**
+3.  **Environment Setup:**
+    Create a `.env` file from the example. Ensure `OLLAMA_BASE_URL` points to your local instance (usually `http://host.docker.internal:11434` if using Docker, or `http://localhost:11434` if bare-metal).
+
+4.  **Running with Docker (Recommended):**
     ```bash
-    poetry run uvicorn app.main:app --reload
+    docker-compose up -d --build
     ```
 
-7. **Start the Celery Worker**
-    ```bash
-    poetry run celery -A app.worker worker --loglevel=info
-    ```
 ---
-## 🧪 Testing & CI/CD
 
-* **Automated Tests**: Project uses pytest for unit and integration tests.
-Run tests locally with:
+## 🧪 Testing
+
+The project includes a full suite of unit and integration tests:
 ```bash
 pytest
 ```
-* **Continuous Integration**: GitHub Actions is configured to run tests automatically on every push and pull request. This ensures that your API and background tasks work correctly before deployment.
 
 ---
 
-## API Reference
-|Method|Endpoint|Description|
-|------|--------|-----------|
-|POST|/auth/register|Register a new user|
-|POST|/auth/login|Login and get JWT tokens|
-|POST|/auth/change-password|Update account password|
-|DELETE|/auth/delete-account|Delete user account|
-|POST|/documents/upload|Upload PDF/DOCX/TXT/XLSX for AI analysis|
-|GET|/documents/{document_id}|Get status and AI summary result|
+## 📚 API Reference (Core Routes)
+
+| Method | Endpoint | Description |
+| :--- | :--- | :--- |
+| **POST** | `/documents/upload` | Upload file, hash contents, and trigger RAG indexing. |
+| **GET** | `/documents/` | List all processed documents. |
+| **POST** | `/documents/{id}/query` | Ask questions to a specific document using RAG. |
+| **GET** | `/documents/{id}` | Check processing status and view AI analysis. |
+| **DELETE** | `/documents/{id}` | Wipe document, local file, cloud object, and vectors. |
+
 ---
 
+## 🤝 Security
 
-## Security
-* **File Validation**: All uploads are scanned for magic bytes to prevent malicious file execution.
-* **OCR Fallback**: Scanned documents are automatically routed through the OCR pipeline.
-* **JWT Auth**: All document routes are protected and scoped to the document owner.
-* **Rate Limiting**: Login and registration routes are limited to prevent brute-force attacks.
-* **CORS Enabled**: Web clients can securely access the API.
----
-
-## Supported Formats
-
-* **PDF** (text or scanned)
-* **DOCX**
-* **TXT**
-* **XLSX**
----
-
-## 📚 Notes
-
-* Scanned PDFs use **Tesseract OCR** to extract text for AI analysis.
-* Large documents are truncated to 8,000 characters before sending to the AI to ensure performance.
-* This project is designed for private, self-hosted AI summarization using local LLMs (Ollama).
-
-
-    
-
+* **JWT Multi-Tenancy**: All data is strictly isolated by user ID.
+* **File Validation**: Magic-byte checking prevents spoofed file uploads.
+* **Rate Limiting**: Integrated protection against brute-force attacks on auth routes.

@@ -1,0 +1,16 @@
+.venv
+__pycache__
+.git
+.env
+tests
+*.pdf
+*.jpg
+node_modules
+frontend/node_modules
+frontend/dist
+.vscode
+.idea
+*.log
+.pytest_cache
+.coverage
+htmlcov

@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Engram | Intelligence Workspace</title>
+    <link rel="stylesheet" href="aegis-core.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+
+    <div id="app">
+        <div id="toast-container"></div>
+        <header>
+            <div class="logo" id="brand-logo" style="cursor: pointer;" onclick="window.scrollTo({top: 0, behavior: 'smooth'})">ENGRAM</div>
+            <nav id="auth-nav">
+                <button id="login-btn" class="btn-text">Login</button>
+                <button id="signup-btn" class="btn-secondary">Get Started</button>
+                
+                <div id="user-hub" class="user-hub hidden">
+                    <button id="user-avatar-btn" class="avatar-btn">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+                        </svg>
+                    </button>
+                    <div id="user-dropdown" class="user-dropdown glass-card hidden">
+                        <button id="profile-btn" class="dropdown-item">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                            Account Profile
+                        </button>
+                        <div class="dropdown-divider"></div>
+                        <button id="logout-btn" class="dropdown-item logout">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg>
+                            Sign Out
+                        </button>
+                    </div>
+                </div>
+            </nav>
+        </header>
+
+        <main>
+            <!-- Loading Overlay -->
+            <div id="loading-overlay" class="loading-overlay hidden">
+                <div class="loader-content">
+                    <div class="spinner"></div>
+                    <p id="loader-text">Generating semantic embeddings...</p>
+                </div>
+            </div>
+
+            <!-- Hero Section -->
+            <div class="hero">
+                <canvas id="nebula-canvas"></canvas>
+                <div class="hero-content">
+                <h2 class="greeting" id="user-greeting">Welcome to Engram</h2>
+                <h1 class="main-title" id="hero-title">Your Intelligence<br>Workspace</h1>
+                
+                <!-- Center Upload Area -->
+                <div id="search-section" class="search-container hidden">
+                    <div id="drop-zone" class="drop-zone-pill">
+                        <span id="upload-hint">Drag & Drop Files or Click to Upload</span>
+                        <div class="action-icons">
+                            <button id="upload-trigger" data-tooltip="Upload Document">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
+                            </button>
+                        </div>
+                    </div>
+                <p class="upload-hint">PDF, Word, Excel, CSV & Text Supported</p>
+            </div>
+        </div>
+
+            <!-- Centered Library Workspace -->
+            <div id="workspace-section" class="workspace hidden">
+                <!-- Scroll Indicator Bridge -->
+                <div class="scroll-indicator-bridge" onclick="document.getElementById('library-header').scrollIntoView({behavior: 'smooth'})">
+                    <div class="mouse"><div class="wheel"></div></div>
+                    <span>Explore Library</span>
+                </div>
+
+                <div id="library-header" class="library-header-center">
+                    <h3>Your Library</h3>
+                    <span id="doc-count">0 Documents</span>
+                </div>
+                <div id="document-grid" class="document-table">
+                    <!-- Intelligence Cards injected here -->
+                    <div class="empty-state">No documents yet.</div>
+                </div>
+            </div>
+
+            <!-- Floating AI Chat Hub -->
+            <div id="chat-hub" class="chat-hub-popup hidden">
+                <div class="chat-hub-header">
+                    <div class="chat-hub-title">
+                        <h4 id="chat-doc-name">Document Name</h4>
+                        <div class="status-dot-container"><span class="status-dot"></span> AI Assistant</div>
+                    </div>
+                    <button id="close-chat" class="btn-icon">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                    </button>
+                </div>
+                <div class="chat-hub-body" id="chat-hub-body">
+                    <div id="chat-messages" class="chat-messages"></div>
+                </div>
+                <div class="chat-hub-footer">
+                    <div class="glass-search">
+                        <input type="text" id="query-input" placeholder="Ask a question...">
+                        <button id="send-query">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Modals & Inputs -->
+        <input type="file" id="file-input" style="display:none" accept=".pdf,.docx,.txt,.png,.jpg">
+
+        <div id="auth-modal" class="modal hidden">
+            <div class="modal-content glass-card">
+                <h2 id="modal-title">Welcome Back</h2>
+                <div id="auth-error" class="error-msg hidden"></div>
+                <div id="name-field" class="hidden">
+                    <input type="text" id="full-name" placeholder="Full Name">
+                </div>
+                <input type="email" id="email" placeholder="Email">
+                <input type="password" id="password" placeholder="Password">
+                <button id="auth-submit" class="btn-primary">Continue</button>
+                <div class="modal-footer">
+                    <p id="modal-toggle-text">Don't have an account? <a href="#" id="modal-toggle">Sign up</a></p>
+                    <button id="modal-close" class="btn-text">Cancel</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="profile-modal" class="modal hidden">
+            <div class="modal-content glass-card profile-card">
+                <h2>Account Profile</h2>
+                <div id="profile-info" class="profile-details"></div>
+                <div class="divider"></div>
+                <div class="security-section">
+                    <h3>Security</h3>
+                    <div class="password-form">
+                        <input type="password" id="current-password" placeholder="Current Password" class="glass-input">
+                        <input type="password" id="new-password" placeholder="New Password" class="glass-input">
+                        <button id="change-password-btn" class="btn-secondary">Update Password</button>
+                    </div>
+                </div>
+                <div class="divider"></div>
+                <div class="danger-zone">
+                    <button id="delete-account-btn" class="btn-danger">Delete Account</button>
+                </div>
+                <div class="modal-footer">
+                    <button id="profile-close" class="btn-text">Close</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="confirm-modal" class="modal hidden">
+            <div class="modal-content glass-card confirm-card">
+                <h2 id="confirm-title">Are you sure?</h2>
+                <p id="confirm-text">This action cannot be undone.</p>
+                <div class="confirm-actions">
+                    <button id="confirm-yes" class="btn-danger">Confirm</button>
+                    <button id="confirm-no" class="btn-secondary">Cancel</button>
+                </div>
+            </div>
+        </div>
+        <!-- Back to Top Button -->
+        <div id="back-to-top" class="back-to-top" onclick="window.scrollTo({top: 0, behavior: 'smooth'})">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 15l-6-6-6 6"/></svg>
+        </div>
+
+    </div>
+    <script src="main.js"></script>
+</body>
+</html>

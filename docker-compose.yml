@@ -1,8 +1,7 @@
-version: "3.9"
 
 services:
   backend:
-    build: .
+    build: ./backend
     container_name: document_backend
     # Use --reload only in development to see code changes instantly
     command: > 
@@ -12,6 +11,9 @@ services:
       - "8000:8000"
     env_file:
       - .env
+    environment:
+      DOCKER_CONTAINER: "true"
+      C_FORCE_ROOT: "true"
     depends_on:
       db:
         condition: service_healthy
@@ -20,7 +22,7 @@ services:
       minio:
         condition: service_started
     volumes:
-      - .:/app
+      - ./backend:/app
       - uploaded_files:/app/app/files
     deploy:
       resources:
@@ -33,7 +35,7 @@ services:
         max-file: "3"
 
   db:
-    image: postgres:18-alpine
+    image: pgvector/pgvector:pg16
     container_name: postgres_db
     restart: always
     environment:
@@ -75,19 +77,24 @@ services:
       - minio_data:/data
 
   worker:
-    build: .
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.worker
     container_name: celery_worker
     command: celery -A app.infrastructure.queue.celery_app worker --loglevel=info -P solo
     env_file: .env
-    # We removed the OLLAMA_HOST here because it will now be read 
-    # from your .env file (pointing to Railway)
+    environment:
+      DOCKER_CONTAINER: "true"
+      C_FORCE_ROOT: "true"
+    # Removed the OLLAMA_BASE_URL=http://host.docker.internal:11434 because it will now be read 
+    # from .env file (pointing to Railway)
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_started
     volumes:
-      - .:/app
+      - ./backend:/app
       - uploaded_files:/app/app/files
     deploy:
       resources:
@@ -99,7 +106,21 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile.frontend
+    container_name: aegis_frontend
+    volumes:
+      - .:/app
+      - frontend_node_modules:/app/frontend/node_modules
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+
 volumes:
   postgres_data:
   minio_data:
   uploaded_files:
+  frontend_node_modules:

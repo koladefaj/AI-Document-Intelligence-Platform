@@ -1,0 +1,18 @@
+FROM node:20-slim
+
+WORKDIR /app/frontend
+
+# Copy package files first from the frontend directory
+COPY frontend/package*.json ./
+
+# Install dependencies during build time
+RUN npm install
+
+# Copy the rest of the frontend code specifically
+COPY frontend/ .
+
+# Expose Vite port
+EXPOSE 5173
+
+# Run dev server
+CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
