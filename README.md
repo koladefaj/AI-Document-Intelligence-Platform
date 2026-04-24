@@ -1,4 +1,4 @@
-# AI Document Intelligence & RAG Platform
+# Engram
 
 [Live Demo: Swagger UI](http://localhost:8000/docs) (Local Only)
 
