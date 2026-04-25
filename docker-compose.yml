@@ -106,11 +106,11 @@ services:
         max-size: "10m"
         max-file: "3"
 
-  frontend:
+  engram_frontend:
     build:
       context: .
       dockerfile: frontend/Dockerfile.frontend
-    container_name: aegis_frontend
+    container_name: engram_frontend
     volumes:
       - .:/app
       - frontend_node_modules:/app/frontend/node_modules

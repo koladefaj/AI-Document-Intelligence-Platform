@@ -66,26 +66,44 @@ def process_document_task(self, document_id: str, request_id: str = "worker-gen"
                     db.commit()
                     return {"document_id": document_id, "status": "CLONED", "source": str(existing_doc.id)}
 
+            # --- 1. TEXT EXTRACTION ---
+            doc.status = "EXTRACTING_TEXT"
+            db.commit()
+            redis_client.publish(channel, json.dumps({"task_id": task_id, "status": "EXTRACTING_TEXT"}))
+
             # Get file path
             path_to_process = async_to_sync(storage_service.get_file_path)(str(doc.id))
 
             if not os.path.exists(path_to_process):
-                # Permanent failure: File missing
                 doc.status = "FAILED"
                 logger.error(f"FILE MISSING: {path_to_process}")
                 raise Exception(f"NON_RETRYABLE: File not found at {path_to_process}")
 
+            # --- 2. AI ANALYSIS (WITH STREAMING) ---
+            doc.status = "GENERATING_SUMMARY"
+            db.commit()
+            redis_client.publish(channel, json.dumps({"task_id": task_id, "status": "GENERATING_SUMMARY"}))
+
+            def on_summary_chunk(chunk: str):
+                # Publish each chunk to Redis for real-time UI updates
+                redis_client.publish(channel, json.dumps({
+                    "task_id": task_id,
+                    "status": "SUMMARY_CHUNK",
+                    "chunk": chunk
+                }))
+
             logger.info(f"Starting AI analysis for {doc.file_name}")
-            
-            # 1. AI Processing (Extraction & Summary)
-            result = processor.process_sync(path_to_process, mime_type=doc.content)
+            result = processor.process_sync(path_to_process, mime_type=doc.content, on_chunk=on_summary_chunk)
             
             # Update document results
             doc.raw_text = result.get("raw_text", "")
             doc.analysis = result.get("analysis", {})
-            doc.status = "COMPLETED"
 
-            # 2. Semantic Indexing (RAG)
+            # --- 3. SEMANTIC INDEXING (RAG) ---
+            doc.status = "GENERATING_EMBEDDINGS"
+            db.commit()
+            redis_client.publish(channel, json.dumps({"task_id": task_id, "status": "GENERATING_EMBEDDINGS"}))
+
             from app.dependencies import get_rag_service
             from llama_index.core import Document as LlamaDocument
             from llama_index.core.node_parser import SentenceSplitter
@@ -99,9 +117,16 @@ def process_document_task(self, document_id: str, request_id: str = "worker-gen"
             logger.info(f"Split document into {len(nodes)} chunks for RAG indexing")
             
             # Index the nodes
+            doc.status = "INDEXING"
+            db.commit()
+            redis_client.publish(channel, json.dumps({"task_id": task_id, "status": "INDEXING"}))
+            
             rag_service.index_nodes(db, str(doc.id), nodes)
 
-            # 3. Cost Optimization: Update User Token Count
+            # --- 4. COMPLETION ---
+            doc.status = "COMPLETED"
+            
+            # Cost Optimization: Update User Token Count
             tokens_used = doc.analysis.get("estimated_tokens", 0)
             from app.infrastructure.db.models import User
             db.query(User).filter(User.id == doc.owner_id).update({

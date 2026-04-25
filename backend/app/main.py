@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 allowed = os.getenv("ALLOWED_HOSTS", "*").split(",")
 
 app = FastAPI(
-    title="Document Intelligence Backend",
+    title="Engram Intelligence Platform",
     description="""
 AI-powered document analysis and **RAG (Retrieval-Augmented Generation)** service using Gemini and Ollama.
 

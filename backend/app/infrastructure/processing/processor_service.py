@@ -9,6 +9,7 @@ from pypdf import PdfReader
 from google import genai
 from docx import Document as DocxReader
 from pdf2image import convert_from_path
+from typing import Any, Optional
 
 
 from app.infrastructure.config import settings
@@ -268,10 +269,9 @@ DOCUMENT:
     
     # CELERY (SYNC)
     
-    def process_sync(self, file_path: str, mime_type: str | None = None) -> dict:
+    def process_sync(self, file_path: str, mime_type: str | None = None, on_chunk: Optional[Any] = None) -> dict:
         """
-        Extracts text and generates a summary. 
-        Vector indexing has been moved to RAGService.
+        Extracts text and generates a summary with streaming support.
         """
         logger.info(f"Processing document for extraction: {file_path}")
 
@@ -292,22 +292,38 @@ DOCUMENT:
             f"Document Content:\n{raw_text[:summary_limit]}"
         )
         
+        full_summary = []
         try:
             if self.provider == "ollama":
+                # Ollama Streaming
                 response = self.ollama_client.chat(
                     model=self.ollama_model,
-                    messages=[{"role": "user", "content": summary_prompt}]
+                    messages=[{"role": "user", "content": summary_prompt}],
+                    stream=True
                 )
-                summary = response["message"]["content"]
+                for chunk in response:
+                    content = chunk.get("message", {}).get("content", "")
+                    if content:
+                        full_summary.append(content)
+                        if on_chunk:
+                            on_chunk(content)
+                summary = "".join(full_summary)
             else:
+                # Gemini Streaming (Cloud)
                 response = self.gemini_client.models.generate_content(
                     model=self.gemini_model,
-                    contents=[summary_prompt]
+                    contents=[summary_prompt],
+                    config={"stream": True}
                 )
-                summary = response.text
+                for chunk in response:
+                    if chunk.text:
+                        full_summary.append(chunk.text)
+                        if on_chunk:
+                            on_chunk(chunk.text)
+                summary = "".join(full_summary)
         except Exception as e:
-            logger.warning(f"Failed to generate initial summary: {e}")
-            summary = "Summary unavailable."
+            logger.warning(f"Failed to generate summary: {e}")
+            summary = "".join(full_summary) if full_summary else "Summary unavailable."
 
         return self._format_results(raw_text, summary)
 

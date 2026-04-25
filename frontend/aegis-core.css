@@ -61,7 +61,7 @@ main {
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  transition: all 0.5s ease;
+  transition: all 0.5s ease-out;
 }
 
 /* Dashboard Mode - Synchronized Symmetery */
@@ -111,8 +111,8 @@ main {
 }
 
 @keyframes float {
-  0%, 100% { transform: translateY(0) scale(1); }
-  50% { transform: translateY(-15px) scale(1.02); }
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-15px); }
 }
 
 @keyframes pulse {
@@ -730,7 +730,7 @@ transform: translate3d(0, -60px, 0) scale(0.3);
   display: flex;
   flex-direction: column;
   box-shadow: 0 20px 60px rgba(0,0,0,0.8);
-  animation: slideUp 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  animation: slideUp 0.5s ease-out;
 }
 
 @keyframes slideUp {
@@ -996,7 +996,8 @@ transform: translate3d(0, -60px, 0) scale(0.3);
   color: rgba(255, 255, 255, 0.7);
   margin-top: 0.5rem;
   max-width: 90%;
-  text-align: left; /* Explicit left alignment */
+  text-align: left;
+  min-height: 40px; /* Prevent jumping */
 }
 
 .intel-card-actions {
@@ -1153,8 +1154,37 @@ transform: translate3d(0, -60px, 0) scale(0.3);
 }
 
 .ai .avatar {
-  background: rgba(255, 255, 255, 0.1);
+  background: #0d0d0d;
   border: 1px solid var(--glass-border);
+  position: relative;
+  z-index: 2;
+}
+
+.avatar-wrapper {
+  position: relative;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-shrink: 0;
+  margin-top: 5px;
+}
+
+.vortex-canvas {
+  position: absolute;
+  top: -25px; /* Nudged down for a better seat on the icon */
+  left: -26px;
+  width: 80px;
+  height: 80px;
+  z-index: 1;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+}
+
+.message.ai.generating .vortex-canvas {
+  opacity: 1;
 }
 
 .msg-content {
@@ -1169,6 +1199,15 @@ transform: translate3d(0, -60px, 0) scale(0.3);
 .ai .msg-content {
   text-align: left;
   border-bottom-left-radius: 4px; /* Subtle tail for AI */
+}
+
+.message.ai.generating .msg-content {
+  display: none; /* Hide during thinking */
+}
+
+.message.ai.generating.streaming .msg-content {
+  display: block; /* Reveal during streaming */
+  animation: fadeIn 0.3s ease-out;
 }
 
 .user .msg-content {
@@ -1188,7 +1227,7 @@ transform: translate3d(0, -60px, 0) scale(0.3);
   align-items: center;
   gap: 2rem;
   cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  transition: all 0.3s ease-out;
 }
 
 .drop-zone-pill:hover {
@@ -1198,22 +1237,12 @@ transform: translate3d(0, -60px, 0) scale(0.3);
   box-shadow: 0 0 20px rgba(41, 171, 226, 0.2);
 }
 
-/* Minimalist Thinking State */
-.thinking-dots {
-  display: flex;
-  gap: 4px;
-  padding: 0.5rem 0;
+/* High-Fidelity AI Generation Nebula (Canvas Powered) */
+.message.ai.generating .avatar {
+  /* Only the canvas vortex should be visible */
 }
 
-.thinking-dots span {
-  width: 6px;
-  height: 6px;
-  background: var(--accent-color);
-  border-radius: 50%;
-  display: inline-block;
-  animation: dotPulse 1.4s infinite ease-in-out both;
-}
-
+.status-badge.extracting_text,
 .intel-card.failed {
   border-color: rgba(255, 69, 58, 0.3);
 }
@@ -1229,16 +1258,32 @@ transform: translate3d(0, -60px, 0) scale(0.3);
 
 .analyzing-text {
   color: var(--accent-color);
-  font-style: italic;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.9rem;
   opacity: 0.8;
-  animation: pulse 2s infinite;
+  display: inline-block;
+  margin-left: 8px;
 }
 
-@keyframes pulse {
-  0% { opacity: 0.5; }
-  50% { opacity: 1; }
-  100% { opacity: 0.5; }
+/* High-Fidelity Vortex Orbit around AI Avatar */
+.message.ai.generating .avatar {
+  position: relative;
+  background: #0d0d0d !important;
+  border: 1px solid var(--glass-border) !important;
+  box-shadow: 0 0 10px rgba(0,0,0,0.5) !important;
 }
+
+.status-badge.extracting_text,
+.status-badge.generating_summary,
+.status-badge.indexing {
+  color: var(--accent-color);
+  opacity: 1;
+  text-shadow: 0 0 8px rgba(41, 171, 226, 0.5);
+}
+
+.status-badge.extracting_text::before { background: #3498db; box-shadow: 0 0 10px #3498db; }
+.status-badge.generating_summary::before { background: #29ABE2; box-shadow: 0 0 10px #29ABE2; }
+.status-badge.indexing::before { background: #1abc9c; box-shadow: 0 0 10px #1abc9c; }
 
 .missing-text {
   color: var(--text-secondary);
@@ -1281,7 +1326,7 @@ transform: translate3d(0, -60px, 0) scale(0.3);
   padding: 0.5rem;
   z-index: 9999; /* Force to top above all headers/main */
   transform-origin: top right;
-  animation: dropdownReveal 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+  animation: dropdownReveal 0.3s ease-out forwards;
 }
 
 @keyframes dropdownReveal {
@@ -1365,7 +1410,7 @@ transform: translate3d(0, -60px, 0) scale(0.3);
   white-space: nowrap;
   opacity: 0;
   pointer-events: none;
-  transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  transition: all 0.2s ease-out;
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
   z-index: 2000;
 }
@@ -1440,7 +1485,7 @@ transform: translate3d(0, -60px, 0) scale(0.3);
   opacity: 0;
   transform: translateY(20px);
   visibility: hidden;
-  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  transition: all 0.4s ease-out;
   box-shadow: 0 0 20px rgba(41, 171, 226, 0.2);
 }
 
@@ -1461,43 +1506,28 @@ transform: translate3d(0, -60px, 0) scale(0.3);
   100% { transform: translateX(-50%) translateY(15px); opacity: 0; }
 }
 
-/* --- CINEMATIC PIPELINE ANIMATION --- */
-.analyzing-text {
-  color: var(--accent-color);
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 0.9rem; /* Increased for better presence */
-  letter-spacing: 0.02em;
-  display: inline-block;
-  white-space: nowrap;
-  overflow: hidden;
-  width: 0;
+/* --- CINEMATIC PIPELINE ANIMATION (CLEANED) --- */
+.wobble-dots {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+  margin-left: 8px;
   vertical-align: middle;
-  animation: pipelineWidth 12s infinite;
 }
 
-.analyzing-text::before {
-  content: "Analyzing structure...";
-  animation: pipelineStages 12s infinite;
+.wobble-dots span {
+  width: 4px;
+  height: 4px;
+  background: var(--accent-color);
+  border-radius: 50%;
+  opacity: 0.6;
+  animation: wobble 1s ease-in-out infinite;
 }
 
-@keyframes pipelineStages {
-  /* Stage 1: Analyzing */
-  0%, 33.3% { content: "Analyzing structure..."; }
-  33.4%, 66.6% { content: "Generating embeddings..."; }
-  66.7%, 100% { content: "Structuring intelligence..."; }
-}
+.wobble-dots span:nth-child(2) { animation-delay: 0.15s; }
+.wobble-dots span:nth-child(3) { animation-delay: 0.3s; }
 
-@keyframes pipelineWidth {
-  /* Rhythm: Type in (8%), Pause (20%), Retract (3%) */
-  0%, 2% { width: 0; }
-  10%, 28% { width: 100%; }
-  31%, 33.3% { width: 0; }
-  
-  33.4%, 35.4% { width: 0; }
-  43.4%, 61.4% { width: 100%; }
-  64.4%, 66.6% { width: 0; }
-  
-  66.7%, 68.7% { width: 0; }
-  76.7%, 94.7% { width: 100%; }
-  97.7%, 100% { width: 0; }
+@keyframes wobble {
+  0%, 100% { transform: translateY(0); opacity: 0.4; }
+  50% { transform: translateY(-4px); opacity: 1; }
 }

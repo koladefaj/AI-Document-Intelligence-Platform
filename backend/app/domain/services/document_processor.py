@@ -10,16 +10,14 @@ class DocumentProcessorInterface(Protocol):
     without breaking the domain logic.
     """
 
-    def process(self, file_path: str, mime_type: Optional[str] = None) -> Dict[str, Any]:
+    async def process(self, file_path: str, mime_type: Optional[str] = None) -> Dict[str, Any]:
+        """Async entry point for document analysis."""
+        ...
+
+    def process_sync(self, file_path: str, mime_type: Optional[str] = None, on_chunk: Optional[Any] = None) -> Dict[str, Any]:
         """
-        The main entry point for document analysis.
-        
-        Args:
-            file_path: The absolute path to the file on disk or /tmp.
-            mime_type: The document type (PDF, Image, etc.) for AI context.
-            
-        Returns:
-            A dictionary containing 'raw_text' and 'analysis'.
+        Synchronous entry point for document analysis (optimized for Celery).
+        Supports an optional on_chunk callback for streaming results.
         """
         ...
 

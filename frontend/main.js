@@ -76,7 +76,7 @@ class NebulaVortex {
                 col,
                 alpha: Math.random() * 0.55 + 0.25,
                 speed: Math.random() * 0.003 + 0.0008,
-                drag: 0.97 + Math.random() * 0.02,
+                drag: 0.82 + Math.random() * 0.08, // Increased drag to eliminate spring bounce
             });
         }
     }
@@ -141,15 +141,14 @@ class NebulaVortex {
             const p = this.particles[i];
             const orbit = this.time * p.speed * 60 + p.orbitOffset;
             
-            // --- AMOEBA EFFECT ---
-            // 4 lobes that undulate over time, stronger on the outer edges
-            const amoebaWobble = 1 + Math.sin(p.baseAngle * 4 - this.time * 2) * 0.15 * (p.baseR / (260 * devicePixelRatio));
+            // 4 lobes that undulate over time, more subtle for a grounded feel
+            const amoebaWobble = 1 + Math.sin(p.baseAngle * 4 - this.time * 2) * 0.08 * (p.baseR / (260 * devicePixelRatio));
             
             const targetX = this.cx + Math.cos(p.baseAngle + orbit) * (p.baseR * breath * amoebaWobble);
             const targetY = this.cy + Math.sin(p.baseAngle + orbit) * (p.baseR * breath * amoebaWobble);
 
-            let fx = (targetX - p.x) * 0.04;
-            let fy = (targetY - p.y) * 0.04;
+            let fx = (targetX - p.x) * 0.02; // Reduced force for smoother target acquisition
+            let fy = (targetY - p.y) * 0.02;
 
             if (hasMouse) {
                 const dx = p.x - this.mouse.x;
@@ -461,19 +460,28 @@ function renderIntelligenceCards(docs) {
         const analysisData = doc.analysis || doc.analysis_results || {};
         
         let summaryText = analysisData.summary || '';
+        let statusDisplay = doc.status.replace('_', ' ');
+        if (doc.status === 'EXTRACTING_TEXT') statusDisplay = 'Extracting Text...';
+        else if (doc.status === 'GENERATING_SUMMARY') statusDisplay = 'Analyzing Intelligence...';
+        else if (doc.status === 'GENERATING_EMBEDDINGS') statusDisplay = 'Generating Embeddings...';
+        else if (doc.status === 'INDEXING') statusDisplay = 'Indexing Knowledge...';
+
         if (isFailed) {
             summaryText = `<div class="error-text">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px;vertical-align:middle;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
                 Analysis Failed: ${doc.error_message || 'Unexpected processing error'}
             </div>`;
         } else if (isProcessing) {
-            summaryText = `<span class="analyzing-text"></span>`;
+            summaryText = `<div class="streaming-summary-container">
+                <strong class="summary-label" style="display:block; margin-bottom: 5px; color: var(--accent-color); font-size: 0.9rem; letter-spacing: 0.05em; text-transform: uppercase;">Summary</strong>
+                <span class="streaming-text">${summaryText}</span>
+                <div class="wobble-dots"><span></span><span></span><span></span></div>
+            </div>`;
         } else if (!summaryText) {
             summaryText = '<span class="missing-text">Summary data unavailable.</span>';
         } else {
-            // Guardrail: Strip lingering AI intros just in case
             const cleaned = summaryText.replace(/^(Here is a|This is a|A concise|Summary:).*?:/i, '').replace(/^SUMMARY\s+/i, '').trim();
-            summaryText = `<strong style="display:block; margin-bottom: 5px; color: var(--accent-color); font-size: 0.9rem; letter-spacing: 0.05em; text-transform: uppercase;">Summary</strong>${cleaned}`;
+            summaryText = `<strong class="summary-label" style="display:block; margin-bottom: 5px; color: var(--accent-color); font-size: 0.9rem; letter-spacing: 0.05em; text-transform: uppercase;">Summary</strong>${cleaned}`;
         }
         
         return `
@@ -483,7 +491,7 @@ function renderIntelligenceCards(docs) {
                     <h4>${doc.file_name}</h4>
                     <div class="intel-meta">
                         <span>${new Date(doc.created_at).toLocaleDateString()}</span>
-                        <span class="status-badge ${doc.status.toLowerCase()}">${doc.status}</span>
+                        <span class="status-badge ${doc.status.toLowerCase()}">${statusDisplay}</span>
                     </div>
                 </div>
                 <div class="intel-card-actions">
@@ -542,17 +550,28 @@ function renderMessage(role, text, isThinking = false) {
 
     let contentHtml = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br>');
     if (isThinking) {
-        contentHtml = `
-            <div class="thinking-dots">
-                <span></span><span></span><span></span>
-            </div>
-        `;
+        msg.classList.add('generating');
+        contentHtml = ''; // Keep content empty while generating initial state
     }
     
+    const avatarId = `vortex-${Math.random().toString(36).substr(2, 9)}`;
     msg.innerHTML = `
-        <div class="avatar">${avatarChar}</div>
+        <div class="avatar-wrapper">
+            <canvas class="vortex-canvas" id="${avatarId}" width="80" height="80"></canvas>
+            <div class="avatar">${avatarChar}</div>
+        </div>
         <div class="msg-content">${contentHtml}</div>
     `;
+    
+    if (isThinking) {
+        msg.classList.add('generating');
+        // Initialize micro-vortex with small delay to ensure DOM is ready
+        setTimeout(() => {
+            const vortex = new MicroVortex(avatarId);
+            msg._vortex = vortex; // Store reference to stop it later
+        }, 10);
+    }
+    
     chatMessages.appendChild(msg);
     chatHubBody.scrollTop = chatHubBody.scrollHeight;
     return msg;
@@ -590,20 +609,14 @@ async function handleQuery(query) {
     renderMessage('user', query); 
     queryInput.value = '';
     
-    // 1. Show Minimalist Thinking Animation
-    const thinkingMsg = renderMessage('ai', '', true);
+    // 1. Show AI Message with Generating Animation
+    const aiMsg = renderMessage('ai', '', true);
+    const content = aiMsg.querySelector('.msg-content');
     
     try {
         const response = await authFetch(`${API_BASE}/documents/${activeDoc.id}/stream?query=${encodeURIComponent(query)}`);
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
-        
-        // Prepare the final message container
-        const aiMsg = renderMessage('ai', '');
-        const content = aiMsg.querySelector('.msg-content');
-        
-        // Remove the thinking bubble once streaming starts
-        thinkingMsg.remove();
         
         let fullResponse = '';
 
@@ -612,11 +625,19 @@ async function handleQuery(query) {
             if (done) break;
             const chunk = decoder.decode(value, { stream: true });
             fullResponse += chunk;
+            if (!aiMsg.classList.contains('streaming')) {
+                aiMsg.classList.add('streaming');
+            }
             content.innerHTML = fullResponse.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br>');
             chatHubBody.scrollTop = chatHubBody.scrollHeight;
         }
+        // Stop generating animation when done
+        aiMsg.classList.remove('generating');
+        if (aiMsg._vortex) aiMsg._vortex.stop();
     } catch (err) { 
-        renderMessage('ai', 'Connection error. Please try again.'); 
+        aiMsg.classList.remove('generating');
+        if (aiMsg._vortex) aiMsg._vortex.stop();
+        content.innerHTML = '<span class="error-text">Connection error. Please try again.</span>';
     }
 }
 
@@ -650,12 +671,32 @@ async function handleUpload(e) {
                 
                 socket.onmessage = (event) => {
                     const update = JSON.parse(event.data);
-                    if (update.status === 'COMPLETED') {
+                    const card = document.getElementById(`card-${data.document_id}`);
+                    const badge = card?.querySelector('.status-badge');
+                    const summaryArea = card?.querySelector('.streaming-text');
+                    const label = card?.querySelector('.summary-label');
+                    const cardStatusText = card?.querySelector('.analyzing-text');
+
+                    if (update.status === 'SUMMARY_CHUNK' && summaryArea) {
+                        if (label) label.style.display = 'block';
+                        if (cardStatusText) cardStatusText.remove(); // Clean up status text when stream starts
+                        summaryArea.textContent += update.chunk;
+                    } else if (update.status === 'COMPLETED') {
                         showToast(`Analysis Ready: ${file.name}`, 'success');
                         fetchDocuments();
                     } else if (update.status === 'FAILED') {
                         showToast(`Analysis failed: ${file.name}`, 'error');
                         fetchDocuments();
+                    } else if (badge && update.status !== 'SUMMARY_CHUNK') {
+                        badge.className = `status-badge ${update.status.toLowerCase()}`;
+                        
+                        let stateText = update.status.replace('_', ' ');
+                        if (update.status === 'EXTRACTING_TEXT') stateText = 'Extracting Text...';
+                        else if (update.status === 'GENERATING_SUMMARY') stateText = 'Analyzing Intelligence...';
+                        else if (update.status === 'GENERATING_EMBEDDINGS') stateText = 'Generating Embeddings...';
+                        else if (update.status === 'INDEXING') stateText = 'Indexing Knowledge...';
+                        
+                        badge.textContent = stateText;
                     }
                 };
             }
@@ -751,6 +792,101 @@ window.deleteDocument = async (id) => {
         showToast('Connection error.', 'error');
     }
 };
+
+/**
+ * High-Fidelity MicroVortex Engine
+ * Particle-driven loading animation for AI avatars
+ */
+class MicroVortex {
+    constructor(canvasId) {
+        this.canvas = document.getElementById(canvasId);
+        if (!this.canvas) return;
+        this.ctx = this.canvas.getContext('2d');
+        this.W = 80;
+        this.H = 80;
+        this.cx = this.W / 2;
+        this.cy = this.H / 2;
+        this.time = 0;
+        this.isGenerating = true;
+        this.NUM = 200;
+        this.particles = [];
+        this.palette = [
+            [20, 80, 200], [180, 200, 250], [41, 171, 226], [29, 171, 226]
+        ];
+        this.init();
+        this.draw();
+    }
+
+    init() {
+        for (let i = 0; i < this.NUM; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const r = 18 + Math.random() * 12; // Tight orbit around the 14px radius (28px total) avatar
+            const col = this.palette[Math.floor(Math.random() * this.palette.length)];
+            
+            const p = {
+                baseAngle: angle,
+                baseR: r,
+                x: 0, y: 0,
+                vx: 0, vy: 0,
+                size: Math.random() * 1.0 + 0.3,
+                col,
+                alpha: Math.random() * 0.6 + 0.2,
+                speed: Math.random() * 0.04 + 0.015,
+                orbitOffset: Math.random() * Math.PI * 2,
+                drag: 0.85
+            };
+
+            const initialAmoeba = 1 + Math.sin(p.baseAngle * 3) * 0.1 * (p.baseR / 30);
+            p.x = this.cx + Math.cos(p.baseAngle + p.orbitOffset) * (p.baseR * initialAmoeba);
+            p.y = this.cy + Math.sin(p.baseAngle + p.orbitOffset) * (p.baseR * initialAmoeba);
+            
+            this.particles.push(p);
+        }
+    }
+
+    stop() {
+        this.isGenerating = false;
+        if (this.canvas) this.canvas.style.opacity = '0';
+    }
+
+    draw() {
+        if (!this.isGenerating) return;
+        
+        this.time += 0.02;
+        this.ctx.clearRect(0, 0, this.W, this.H);
+
+        const breath = 1 + 0.05 * Math.sin(this.time * 2);
+
+        for (let i = 0; i < this.NUM; i++) {
+            const p = this.particles[i];
+            const orbit = this.time * p.speed * 10 + p.orbitOffset;
+            const amoebaWobble = 1 + Math.sin(p.baseAngle * 3 - this.time * 3) * 0.1 * (p.baseR / 30);
+
+            const targetX = this.cx + Math.cos(p.baseAngle + orbit) * (p.baseR * breath * amoebaWobble);
+            const targetY = this.cy + Math.sin(p.baseAngle + orbit) * (p.baseR * breath * amoebaWobble);
+
+            let fx = (targetX - p.x) * 0.1;
+            let fy = (targetY - p.y) * 0.1;
+
+            p.vx = (p.vx + fx) * p.drag;
+            p.vy = (p.vy + fy) * p.drag;
+            p.x += p.vx;
+            p.y += p.vy;
+
+            const distCenter = Math.hypot(p.x - this.cx, p.y - this.cy);
+            const dimCenter = Math.max(0, 1 - (distCenter - 14) / 15); 
+            const alpha = p.alpha * dimCenter;
+            
+            const [r, g, b] = p.col;
+            this.ctx.beginPath();
+            this.ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+            this.ctx.fillStyle = `rgba(${r},${g},${b},${alpha.toFixed(2)})`;
+            this.ctx.fill();
+        }
+
+        requestAnimationFrame(() => this.draw());
+    }
+}
 
 // Identity Handlers
 loginBtn.addEventListener('click', (e) => { e.stopPropagation(); authMode = 'login'; updateModalUI(); authModal.classList.remove('hidden'); });
