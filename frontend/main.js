@@ -1,6 +1,6 @@
 /**
- * Aegis Intelligence Portal - Nebula Vortex V3
- * High-Fidelity Particle Engine (Aegis Blue Edition)
+ * Engram Intelligence Portal - Nebula Vortex V3
+ * High-Fidelity Particle Engine (Engram Blue Edition)
  */
 class NebulaVortex {
     constructor(canvasId) {
@@ -34,7 +34,7 @@ class NebulaVortex {
         const cx = this.cx;
         const cy = this.cy;
         
-        // Aegis Electric Blue Palette - Toned down whites
+        // Engram Electric Blue Palette - Toned down whites
         const palette = [
             [41, 171, 226],  // Brand Blue
             [0, 114, 187],   // Deep Blue
@@ -89,31 +89,8 @@ class NebulaVortex {
     }
 
     resize() {
-        const oldCx = this.cx;
-        const oldCy = this.cy;
-        
         this.updateSize();
-        
-        const shiftX = this.cx - oldCx;
-        const shiftY = this.cy - oldCy;
-
-        // Shift active particles
-        this.particles.forEach(p => {
-            p.x += shiftX;
-            p.y += shiftY;
-        });
-
-        // Shift background starfield
-        this.bgParticles.forEach(p => {
-            p.x += shiftX;
-            p.y += shiftY;
-        });
-
-        // Shift active sparks
-        this.sparks.forEach(s => {
-            s.x += shiftX;
-            s.y += shiftY;
-        });
+        this.init(); // Re-init particles on resize
     }
 
     spawnSpark(mx, my) {
@@ -222,7 +199,7 @@ const API_BASE = window.location.origin.includes(':5173')
     ? `http://${HOST}:8000/api/v1` 
     : '/api/v1';
 
-console.log(`Aegis: Initializing Intelligence Link at ${API_BASE}`);
+console.log(`Engram: Initializing Intelligence Link at ${API_BASE}`);
 
 let authToken = localStorage.getItem('access_token');
 let refreshToken = localStorage.getItem('refresh_token');
@@ -780,14 +757,14 @@ loginBtn.addEventListener('click', (e) => { e.stopPropagation(); authMode = 'log
 signupBtn.addEventListener('click', (e) => { e.stopPropagation(); authMode = 'signup'; updateModalUI(); authModal.classList.remove('hidden'); });
 
 logoutBtn.addEventListener('click', (e) => {
-    console.log("Aegis: Logout Triggered");
+    console.log("Engram: Logout Triggered");
     e.stopPropagation();
     userDropdown.classList.add('hidden');
     logout();
 });
 
 profileBtn.addEventListener('click', (e) => {
-    console.log("Aegis: Profile Triggered");
+    console.log("Engram: Profile Triggered");
     e.stopPropagation();
     if (!currentUser) return;
     userDropdown.classList.add('hidden');
