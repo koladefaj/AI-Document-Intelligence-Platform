@@ -51,41 +51,51 @@ The platform is designed for **Zero Data Loss** and high availability in the bac
 
 ## 🛠️ Setup & Installation
 
-### Prerequisites
+The easiest way to run the platform is via **Docker**, which orchestrates all services (API, Worker, Frontend, Database, Redis, MinIO) and automatically handles database migrations.
 
-1.  **Python 3.10+**
-2.  **PostgreSQL** (with `pgvector` extension)
-3.  **Redis** (for Celery)
-4.  **Tesseract OCR** (`apt install tesseract-ocr`)
-5.  **Ollama** (Required for local AI processing - [Download here](https://ollama.com/))
+### 🐳 Running with Docker (Recommended)
 
-### Installation
-
-1.  **Install Dependencies:**
+1.  **Environment Setup**:
+    Create a `.env` file from `.env.example`.
+    
+2.  **Start the Platform**:
     ```bash
-    poetry install
+    docker-compose up -d --build
     ```
+    *This command will automatically run `alembic upgrade head` to set up your database schema.*
 
-2.  **Database Migration:**
+3.  **Access the Platform**:
+    - **Frontend**: [http://localhost:5173](http://localhost:5173)
+    - **API Docs (Swagger)**: [http://localhost:8000/docs](http://localhost:8000/docs)
+
+---
+
+### 🐍 Local Development (Bare Metal)
+
+If running outside of Docker, ensure you have **Python 3.10+**, **PostgreSQL** (with `pgvector`), **Redis**, and **Tesseract OCR** installed.
+
+1.  **Backend Setup**:
     ```bash
+    cd backend
+    poetry install
     alembic upgrade head
     ```
 
-3.  **Environment Setup:**
-    Create a `.env` file from the example. Ensure `OLLAMA_BASE_URL` points to your local instance (usually `http://host.docker.internal:11434` if using Docker, or `http://localhost:11434` if bare-metal).
-
-4.  **Running with Docker (Recommended):**
+2.  **Frontend Setup**:
     ```bash
-    docker-compose up -d --build
+    cd frontend
+    npm install
+    npm run dev
     ```
 
 ---
 
 ## 🧪 Testing
 
-The project includes a full suite of unit and integration tests:
+The project includes a full suite of unit and integration tests located in the `backend` directory:
 ```bash
-pytest
+cd backend
+poetry run pytest
 ```
 
 ---
